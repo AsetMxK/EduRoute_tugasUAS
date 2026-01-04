@@ -109,6 +109,15 @@ const App = () => {
     }
   };
 
+  // Reset/Clear State
+  const handleReset = () => {
+    setStartPoint(null);
+    setSelectedSchool(null);
+    setRouteData(null);
+    // Optional: Reset map view center if we had a ref
+    console.log("State reset");
+  };
+
   // Function to fly to school (passed to overlay)
   const handleSelectSchool = (school) => {
     // We can pass a "selectedLocation" state to MapView to trigger a FlyTo
@@ -146,6 +155,7 @@ const App = () => {
             console.log("Trigger Route Search");
             handleFindRoute(selectedSchool);
           }}
+          onReset={handleReset}
         />
 
         {/* Leaflet Map (Z-Index 0) */}

@@ -14,14 +14,42 @@ import { toast } from "sonner"; // shadcn uses sonner usually, or toast
 // I will use simple alerts/console for simplicity in this step, or try to use "sonner" if I installed it? I installed "toast" which is usually "sonner" in latest shadcn.
 // Let's assume standard behavior.
 
-// Fix default icon
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
+// Custom Icons using generic HTML
+const createCustomIcon = (color, emoji) => {
+    return L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="
+            background-color: ${color};
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        ">${emoji}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+    });
+};
+
+const schoolIcon = createCustomIcon('#10b981', '🏫'); // Emerald-500
+
+// SVG Pin Icon for Start Location (Better visual)
+const startIcon = L.divIcon({
+    className: 'custom-pin-marker',
+    html: `
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.3));">
+        <path d="M20 0C11.1634 0 4 7.16344 4 16C4 26 20 40 20 40C20 40 36 26 36 16C36 7.16344 28.8366 0 20 0Z" fill="#3b82f6"/>
+        <circle cx="20" cy="16" r="6" fill="white"/>
+    </svg>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40], // Tip at bottom center
+    popupAnchor: [0, -40]
 });
-L.Marker.prototype.options.icon = DefaultIcon;
 
 // Helper: Simple Haversine for Client-Side Snapping
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -44,7 +72,6 @@ function ClickHandler({ setStartPoint, graphNodes }) {
 
             // 1. Try to snap to nearest GraphNode if available
             if (graphNodes && graphNodes.length > 0) {
-                let text = "Lokasi ditentukan";
                 let bestNode = null;
                 let minDst = Infinity;
 
@@ -58,7 +85,6 @@ function ClickHandler({ setStartPoint, graphNodes }) {
                 }
 
                 // Threshold: Only snap if within reasonable distance (e.g., 500m)
-                // Actually for "Node Centric", we kinda ALWAYS want to snap, or user can't route.
                 if (bestNode && minDst < 1000) {
                     setStartPoint({ lat: bestNode.latitude, lng: bestNode.longitude, nodeId: bestNode.id });
                     toast.success(`Snapped to nearest Node #${bestNode.id} (${Math.round(minDst)}m away)`);
@@ -75,14 +101,28 @@ function ClickHandler({ setStartPoint, graphNodes }) {
     return null;
 }
 
+// Helper to Recenter Map
+const MapController = ({ startPoint, selectedSchool }) => {
+    const map = useMap();
+
+    // Auto-fly when startPoint or selectedSchool changes
+    useEffect(() => {
+        if (startPoint) {
+            map.flyTo([startPoint.lat, startPoint.lng], 15, { duration: 1.5 });
+        }
+    }, [startPoint, map]);
+
+    useEffect(() => {
+        if (selectedSchool) {
+            const [lon, lat] = selectedSchool.geometry.coordinates;
+            map.flyTo([lat, lon], 16, { duration: 1.5 });
+        }
+    }, [selectedSchool, map]);
+
+    return null;
+};
+
 const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [], graphNodes = [], graphEdges = [], startPoint, setStartPoint, selectedSchool, setSelectedSchool, onFindRoute }) => {
-    // const [routePath, setRoutePath] = useState([]); // Moved to App.jsx
-    // const [startPoint, setStartPoint] = useState(null); // Moved to App.jsx
-    // const [loading, setLoading] = useState(true); // Handled by App? or just removed.
-
-    // 1. Fetching Logic removed (Lifted to App.jsx)
-
-    // 2. Find Route Function (Removed - Lifted to App.jsx)
 
     return (
         <div className="h-full w-full z-0 relative">
@@ -97,11 +137,12 @@ const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [],
                     attribution='&copy; OpenStreetMap contributors'
                 />
 
+                <MapController startPoint={startPoint} selectedSchool={selectedSchool} />
                 <ClickHandler setStartPoint={setStartPoint} graphNodes={graphNodes} />
 
                 {/* User Location Marker */}
                 {startPoint && (
-                    <Marker position={[startPoint.lat, startPoint.lng]}>
+                    <Marker position={[startPoint.lat, startPoint.lng]} icon={startIcon}>
                         <Popup>
                             <strong>Lokasi Anda (Start)</strong><br />
                             {startPoint.nodeId ? `Node ID: ${startPoint.nodeId}` : 'Koordinat Manual'}
@@ -111,7 +152,7 @@ const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [],
 
                 {/* Route Path (A* Result) */}
                 {currentRoutePath && currentRoutePath.length > 0 && (
-                    <Polyline positions={currentRoutePath} color="blue" weight={5} opacity={0.7} />
+                    <Polyline positions={currentRoutePath} color="#3b82f6" weight={6} opacity={0.8} dashArray="10, 10" />
                 )}
 
                 {/* --- GRAPH VIZ LAYER (DEBUG) --- */}
@@ -119,19 +160,13 @@ const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [],
                     <>
                         {/* 1. Edges (Lines) */}
                         {graphEdges.map((edge, idx) => {
-                            // Geometry is stored as GeoJSON object { type: "LineString", coordinates: [...] }
-                            // We need to extract coordinates and convert to [lat, lon]
                             let positions = [];
                             if (edge.geometry && edge.geometry.coordinates && Array.isArray(edge.geometry.coordinates)) {
-                                positions = edge.geometry.coordinates.map(p => [p[1], p[0]]); // [lon, lat] -> [lat, lon]
+                                positions = edge.geometry.coordinates.map(p => [p[1], p[0]]);
                             } else if (Array.isArray(edge.geometry)) {
-                                // Fallback if it was stored as raw array
                                 positions = edge.geometry.map(p => [p[1], p[0]]);
                             }
-
-                            return (
-                                <Polyline key={`edge-${idx}`} positions={positions} pathOptions={{ color: '#94a3b8', weight: 2, opacity: 0.5 }} />
-                            );
+                            return <Polyline key={`edge-${idx}`} positions={positions} pathOptions={{ color: '#94a3b8', weight: 2, opacity: 0.5 }} />;
                         })}
 
                         {/* 2. Nodes (Points) */}
@@ -143,17 +178,12 @@ const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [],
                                 pathOptions={{ color: '#475569', fillColor: '#cbd5e1', fillOpacity: 0.8, weight: 1 }}
                                 eventHandlers={{
                                     click: () => {
-                                        console.log("Clicked Node:", node.id);
                                         toast.success(`Start Point set to Node #${node.id}`);
-                                        setStartPoint({ lat: node.latitude, lng: node.longitude });
+                                        setStartPoint({ lat: node.latitude, lng: node.longitude, nodeId: node.id });
                                     }
                                 }}
                             >
-                                <Popup>
-                                    Node ID: {node.id}<br />
-                                    Lat: {node.latitude}<br />
-                                    Lon: {node.longitude}
-                                </Popup>
+                                <Popup>Node ID: {node.id}</Popup>
                             </CircleMarker>
                         ))}
                     </>
@@ -163,12 +193,13 @@ const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [],
                 {layersState.zones && zones.map((zone, idx) => (
                     <Polygon
                         key={`zone-${idx}`}
-                        positions={zone.geometry.coordinates[0].map(coord => [coord[1], coord[0]])} // GeoJSON is [lon, lat], Leaflet is [lat, lon]
+                        positions={zone.geometry.coordinates[0].map(coord => [coord[1], coord[0]])}
                         pathOptions={{
-                            color: zone.properties.color,
-                            fillColor: zone.properties.color,
-                            fillOpacity: 0.2,
-                            weight: 1
+                            color: zone.properties.color || '#10b981',
+                            fillColor: zone.properties.color || '#10b981',
+                            fillOpacity: 0.15,
+                            weight: 1.5,
+                            dashArray: '5, 5'
                         }}
                     >
                         <Popup>{zone.properties.name}</Popup>
@@ -177,32 +208,27 @@ const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [],
 
                 {/* Render Schools (Markers) */}
                 {schools.map((school, idx) => {
-                    // GeoJSON Point coordinates: [lon, lat] -> Leaflet [lat, lon]
                     const [lon, lat] = school.geometry.coordinates;
-
                     return (
-                        <Marker key={`school-${idx}`} position={[lat, lon]}>
+                        <Marker key={`school-${idx}`} position={[lat, lon]} icon={schoolIcon}>
                             <Popup>
-                                <div className="min-w-[200px]">
-                                    <h3 className="font-bold text-lg mb-1">{school.properties.name}</h3>
-                                    <p className="text-sm text-gray-600 mb-2">{school.properties.address}</p>
-                                    <p className="text-xs text-gray-500 mb-3">{school.properties.description}</p>
+                                <div className="min-w-[200px] p-1">
+                                    <h3 className="font-bold text-lg mb-1 text-emerald-800">{school.properties.name}</h3>
+                                    <p className="text-sm text-slate-600 mb-2">{school.properties.address}</p>
                                     <button
-                                        className="bg-emerald-600 text-white px-3 py-1.5 rounded text-sm w-full hover:bg-emerald-700 transition"
+                                        className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm w-full hover:bg-emerald-700 transition shadow-md font-semibold"
                                         onClick={() => {
                                             if (setSelectedSchool) setSelectedSchool(school);
                                             if (onFindRoute) onFindRoute(school);
                                         }}
                                     >
-                                        Cari Rute ke Sini
+                                        Navigasi ke Sini
                                     </button>
                                 </div>
                             </Popup>
                         </Marker>
                     );
                 })}
-
-                {/* Bus/Angkot routes layers would go here if we had data */}
 
             </MapContainer>
         </div>
