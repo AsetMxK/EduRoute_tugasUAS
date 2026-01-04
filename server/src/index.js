@@ -94,23 +94,29 @@ app.get('/api/gis-data', async (req, res) => {
 
 // Endpoint 2: Find Path (A* Algorithm)
 app.post('/api/find-path', async (req, res) => {
-    const { startLat, startLon, endLat, endLon } = req.body;
+    const { startLat, startLon, endLat, endLon, startNodeId, endNodeId } = req.body;
 
-    // Validate input
+    // Validate input (Lat/Lon still required as fallback or for end point)
     if (
-        startLat === undefined ||
-        startLon === undefined ||
-        endLat === undefined ||
-        endLon === undefined
+        (startLat === undefined || startLon === undefined) && startNodeId === undefined
     ) {
         return res.status(400).json({
             success: false,
-            message: 'Missing required parameters: startLat, startLon, endLat, endLon',
+            message: 'Missing start location (Lat/Lon or NodeID)',
+        });
+    }
+
+    if (
+        (endLat === undefined || endLon === undefined) && endNodeId === undefined
+    ) {
+        return res.status(400).json({
+            success: false,
+            message: 'Missing end location (Lat/Lon or NodeID)',
         });
     }
 
     console.log(
-        `Mencari rute dari [${startLat}, ${startLon}] ke [${endLat}, ${endLon}]`
+        `Mencari rute. StartNode: ${startNodeId || 'Nearest'}, EndNode: ${endNodeId || 'Nearest'}`
     );
 
     try {
@@ -118,13 +124,16 @@ app.post('/api/find-path', async (req, res) => {
             parseFloat(startLat),
             parseFloat(startLon),
             parseFloat(endLat),
-            parseFloat(endLon)
+            parseFloat(endLon),
+            startNodeId,
+            endNodeId
         );
 
         if (result) {
             res.json({
                 success: true,
                 distance_meters: result.distance_meters,
+                duration_minutes: result.duration_minutes,
                 path: result.path,
             });
         } else {

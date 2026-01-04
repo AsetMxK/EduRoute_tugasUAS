@@ -21,6 +21,8 @@ const App = () => {
   const [graphNodes, setGraphNodes] = useState([]); // Nodes for visualization
   const [graphEdges, setGraphEdges] = useState([]); // Edges for visualization
   const [routeData, setRouteData] = useState(null); // { path, distance_meters, duration_minutes }
+  const [startPoint, setStartPoint] = useState(null); // Lifted state for User Location
+  const [selectedSchool, setSelectedSchool] = useState(null); // Lifted state for Target School
 
   // Fetch Data Global
   useEffect(() => {
@@ -63,6 +65,50 @@ const App = () => {
     setRouteData(data);
   };
 
+  // Centralized Route Finding Logic
+  const handleFindRoute = async (targetSchool) => {
+    if (!startPoint) {
+      // We can use a toast here if we imported it, or just return and let UI handle it.
+      // Since Toaster is in App, we can use toast.
+      // Import toast at top if not present, but for now console.error or alert.
+      alert("Lokasi Anda belum ditentukan! Klik pada peta.");
+      return;
+    }
+
+    if (!targetSchool) {
+      alert("Pilih sekolah tujuan terlebih dahulu!");
+      return;
+    }
+
+    // Extract coordinates from targetSchool
+    const [schoolLon, schoolLat] = targetSchool.geometry.coordinates;
+
+    try {
+      const payload = {
+        startLat: startPoint.lat,
+        startLon: startPoint.lng,
+        endLat: parseFloat(schoolLat),
+        endLon: parseFloat(schoolLon)
+      };
+
+      if (startPoint.nodeId) {
+        payload.startNodeId = startPoint.nodeId;
+      }
+
+      const response = await axios.post('http://localhost:5000/api/find-path', payload);
+
+      if (response.data.success) {
+        setRouteData(response.data);
+        // toast.success(`Rute ditemukan! Jarak: ${(response.data.distance_meters / 1000).toFixed(1)} km`);
+      } else {
+        alert("Rute tidak ditemukan: " + response.data.message);
+      }
+    } catch (error) {
+      console.error("Error finding path:", error);
+      alert("Terjadi kesalahan saat mencari rute.");
+    }
+  };
+
   // Function to fly to school (passed to overlay)
   const handleSelectSchool = (school) => {
     // We can pass a "selectedLocation" state to MapView to trigger a FlyTo
@@ -89,11 +135,16 @@ const App = () => {
           toggleLayer={handleToggleLayer}
           routeData={routeData} // Pass route statistics
           schools={schools}     // Pass schools list
-          onSelectSchool={handleSelectSchool}
+          startPoint={startPoint} // Pass user location info
+          selectedSchool={selectedSchool} // Pass selected school
+          setSelectedSchool={setSelectedSchool} // Pass setter
+          onSelectSchool={(school) => {
+            handleSelectSchool(school);
+            setSelectedSchool(school);
+          }}
           onSearchRoute={() => {
             console.log("Trigger Route Search");
-            // Optional: We can clear route here
-            setRouteData(null);
+            handleFindRoute(selectedSchool);
           }}
         />
 
@@ -105,6 +156,10 @@ const App = () => {
           zones={zones}     // Pass data down
           graphNodes={graphNodes} // Pass graph data
           graphEdges={graphEdges} // Pass graph data
+          startPoint={startPoint} // Pass lifted state
+          setStartPoint={setStartPoint} // Pass setter
+          selectedSchool={selectedSchool} // Pass selected school
+          setSelectedSchool={setSelectedSchool} // Pass setter
           onRouteFound={handleRouteFound}
           currentRoutePath={routeData?.path || []} // Pass path back to MapView for rendering
         />

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, schools = [], onSelectSchool }) => {
+const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, schools = [], onSelectSchool, startPoint, selectedSchool, setSelectedSchool }) => {
     const containerRef = useRef();
     const [isExpanded, setIsExpanded] = useState(true);
 
@@ -162,14 +162,36 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                         <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-1">DARI</p>
-                                            <p className="text-sm font-medium truncate text-slate-700">Lokasi Anda</p>
+                                            <p className="text-sm font-medium truncate text-slate-700">
+                                                {startPoint ? (
+                                                    startPoint.nodeId
+                                                        ? `Node Graph ID: ${startPoint.nodeId}`
+                                                        : `Lokasi Manual (${startPoint.lat.toFixed(4)}, ${startPoint.lng.toFixed(4)})`
+                                                ) : "Lokasi Belum Dipilih (Klik Peta)"}
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="p-2.5 bg-slate-50 rounded border border-slate-100 flex items-center gap-3">
                                         <div className="w-2 h-2 rounded-full bg-red-500 shrink-0"></div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-1">KE</p>
-                                            <p className="text-sm font-medium truncate text-slate-700">Target Sekolah...</p>
+                                            <select
+                                                className="w-full text-sm font-medium text-slate-700 bg-transparent border-none p-0 focus:ring-0 cursor-pointer text-ellipsis appearance-none outline-none"
+                                                value={selectedSchool ? selectedSchool.properties.name : ""}
+                                                onChange={(e) => {
+                                                    const school = schools.find(s => s.properties.name === e.target.value);
+                                                    if (school && setSelectedSchool) {
+                                                        setSelectedSchool(school);
+                                                    }
+                                                }}
+                                            >
+                                                <option value="" disabled>Pilih Tujuan Sekolah...</option>
+                                                {schools.map((s, idx) => (
+                                                    <option key={idx} value={s.properties.name}>
+                                                        {s.properties.name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
                                     <Button className="w-full bg-emerald-600 hover:bg-emerald-700 h-10 shadow-lg shadow-emerald-600/20" onClick={onSearchRoute}>

@@ -75,44 +75,14 @@ function ClickHandler({ setStartPoint, graphNodes }) {
     return null;
 }
 
-const MapView = ({ layersState, onRouteFound, currentRoutePath = [], schools = [], zones = [], graphNodes = [], graphEdges = [] }) => {
+const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [], graphNodes = [], graphEdges = [], startPoint, setStartPoint, selectedSchool, setSelectedSchool, onFindRoute }) => {
     // const [routePath, setRoutePath] = useState([]); // Moved to App.jsx
-    const [startPoint, setStartPoint] = useState(null);
+    // const [startPoint, setStartPoint] = useState(null); // Moved to App.jsx
     // const [loading, setLoading] = useState(true); // Handled by App? or just removed.
 
     // 1. Fetching Logic removed (Lifted to App.jsx)
 
-    // 2. Find Route Function
-    const handleFindRoute = async (schoolLat, schoolLon) => {
-        if (!startPoint) {
-            toast.error("Silakan klik peta terlebih dahulu untuk menentukan lokasi Anda!");
-            return;
-        }
-
-        const toastId = toast.loading("Sedang mencari rute terbaik...");
-
-        try {
-            const response = await axios.post('http://localhost:5000/api/find-path', {
-                startLat: startPoint.lat,
-                startLon: startPoint.lng,
-                endLat: parseFloat(schoolLat),
-                endLon: parseFloat(schoolLon)
-            });
-
-            if (response.data.success) {
-                toast.dismiss(toastId);
-                toast.success(`Rute ditemukan! Jarak: ${(response.data.distance_meters / 1000).toFixed(1)} km`);
-                if (onRouteFound) onRouteFound(response.data);
-            } else {
-                toast.dismiss(toastId);
-                toast.error("Rute tidak ditemukan: " + response.data.message);
-            }
-        } catch (error) {
-            console.error("Error finding path:", error);
-            toast.dismiss(toastId);
-            toast.error("Terjadi kesalahan saat mencari rute.");
-        }
-    };
+    // 2. Find Route Function (Removed - Lifted to App.jsx)
 
     return (
         <div className="h-full w-full z-0 relative">
@@ -219,7 +189,10 @@ const MapView = ({ layersState, onRouteFound, currentRoutePath = [], schools = [
                                     <p className="text-xs text-gray-500 mb-3">{school.properties.description}</p>
                                     <button
                                         className="bg-emerald-600 text-white px-3 py-1.5 rounded text-sm w-full hover:bg-emerald-700 transition"
-                                        onClick={() => handleFindRoute(lat, lon)}
+                                        onClick={() => {
+                                            if (setSelectedSchool) setSelectedSchool(school);
+                                            if (onFindRoute) onFindRoute(school);
+                                        }}
                                     >
                                         Cari Rute ke Sini
                                     </button>

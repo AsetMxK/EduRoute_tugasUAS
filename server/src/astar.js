@@ -87,12 +87,18 @@ class AStarPathfinder {
         return this.calculateHaversine(nodeA.lat, nodeA.lon, nodeB.lat, nodeB.lon);
     }
 
-    // V2 Logic: Snap to Nearest Graph Node
+    // V2 Logic: Snap to Nearest *Connected* Graph Node
     findNearestNode(lat, lon) {
         let minDist = Infinity;
         let nearestId = -1;
 
         for (const id in this.nodes) {
+            // Optimization: Skip nodes that explicitly have no edges (Isolated)
+            // This prevents snapping to "Sample Nodes" that aren't connected to the road network
+            if (!this.adjacency[id] || this.adjacency[id].length === 0) {
+                continue;
+            }
+
             const node = this.nodes[id];
             const dist = this.calculateHaversine(lat, lon, node.lat, node.lon);
 
@@ -104,16 +110,26 @@ class AStarPathfinder {
 
         // Log info for debugging
         if (nearestId !== -1) {
-            console.log(`Snapped user location [${lat}, ${lon}] to Node ID ${nearestId} (${this.nodes[nearestId].label || 'No Label'}), Dist: ${Math.round(minDist)}m`);
+            console.log(`Snapped user location [${lat}, ${lon}] to Connected Node ID ${nearestId} (${this.nodes[nearestId].label || 'No Label'}), Dist: ${Math.round(minDist)}m`);
+        } else {
+            console.warn(`Could not find any connected node near [${lat}, ${lon}]`);
         }
 
         return nearestId;
     }
 
-    findPath(startLat, startLon, endLat, endLon) {
-        // 1. Snap coordinates to nearest Nodes
-        const startNodeId = this.findNearestNode(startLat, startLon);
-        const endNodeId = this.findNearestNode(endLat, endLon);
+    findPath(startLat, startLon, endLat, endLon, explicitStartNodeId = null, explicitEndNodeId = null) {
+        // 1. Determine Start/End Nodes
+        // If explicit ID provided, use it. Otherwise, snap coordinates.
+        let startNodeId = explicitStartNodeId;
+        if (!startNodeId && startLat !== undefined && startLon !== undefined) {
+            startNodeId = this.findNearestNode(startLat, startLon);
+        }
+
+        let endNodeId = explicitEndNodeId;
+        if (!endNodeId && endLat !== undefined && endLon !== undefined) {
+            endNodeId = this.findNearestNode(endLat, endLon);
+        }
 
         console.log(`Finding path V2 from Node ${startNodeId} to Node ${endNodeId}`);
 
@@ -151,9 +167,12 @@ class AStarPathfinder {
                 const neighborId = neighbor.target;
                 const weight = neighbor.weight;
 
-                const tentativeGScore = gScore[currentId] + weight;
+                const currentG = gScore[currentId] !== undefined ? gScore[currentId] : Infinity;
+                const tentativeGScore = currentG + weight;
 
-                if (tentativeGScore < gScore[neighborId]) {
+                const neighborG = gScore[neighborId] !== undefined ? gScore[neighborId] : Infinity;
+
+                if (tentativeGScore < neighborG) {
                     // Determine if we are traversing the edge forward or backward
                     // If we go from neighbor.originalSource (current) to neighbor.target (neighbor), it is forward
                     // Wait, 'neighbor' object in adjacency already tells us the target.
