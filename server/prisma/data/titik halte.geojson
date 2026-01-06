@@ -1,0 +1,31 @@
+{
+"type": "FeatureCollection",
+"name": "titik halte",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": 1, "nama_halte": "Halte SMP Negeri 2" }, "geometry": { "type": "Point", "coordinates": [ 117.492406709377974, 0.123482919461646 ] } },
+{ "type": "Feature", "properties": { "id": 2, "nama_halte": "Halte SMA Monamas" }, "geometry": { "type": "Point", "coordinates": [ 117.490072636334077, 0.131818596052446 ] } },
+{ "type": "Feature", "properties": { "id": 3, "nama_halte": "Halte Rigomasi" }, "geometry": { "type": "Point", "coordinates": [ 117.484907765400891, 0.129251538887935 ] } },
+{ "type": "Feature", "properties": { "id": 4, "nama_halte": "Halte Yamaha" }, "geometry": { "type": "Point", "coordinates": [ 117.487804313004474, 0.136294475883186 ] } },
+{ "type": "Feature", "properties": { "id": 5, "nama_halte": "Halte Bahrul Ulum" }, "geometry": { "type": "Point", "coordinates": [ 117.481772774386414, 0.136587268189801 ] } },
+{ "type": "Feature", "properties": { "id": 6, "nama_halte": "Halte Jalan Tembus I" }, "geometry": { "type": "Point", "coordinates": [ 117.472533320963223, 0.13599070386131 ] } },
+{ "type": "Feature", "properties": { "id": 7, "nama_halte": "Halte Jalan Tembus II" }, "geometry": { "type": "Point", "coordinates": [ 117.47183976722043, 0.137053905921094 ] } },
+{ "type": "Feature", "properties": { "id": 8, "nama_halte": "Halte Yabis" }, "geometry": { "type": "Point", "coordinates": [ 117.464952033396983, 0.137829236641009 ] } },
+{ "type": "Feature", "properties": { "id": 9, "nama_halte": "Halte Terminal" }, "geometry": { "type": "Point", "coordinates": [ 117.4551744974233, 0.139409121804159 ] } },
+{ "type": "Feature", "properties": { "id": 10, "nama_halte": "Halte SMK Negeri I" }, "geometry": { "type": "Point", "coordinates": [ 117.475180585296016, 0.144169419561227 ] } },
+{ "type": "Feature", "properties": { "id": 11, "nama_halte": "Halte SMA Negeri 3" }, "geometry": { "type": "Point", "coordinates": [ 117.462970742499934, 0.16792194595982 ] } },
+{ "type": "Feature", "properties": { "id": 12, "nama_halte": "Halte SMP Negeri 5" }, "geometry": { "type": "Point", "coordinates": [ 117.467731044482477, 0.172591421858135 ] } },
+{ "type": "Feature", "properties": { "id": 13, "nama_halte": "Halte KPI" }, "geometry": { "type": "Point", "coordinates": [ 117.46817735969141, 0.176443019234898 ] } },
+{ "type": "Feature", "properties": { "id": 15, "nama_halte": "Halte Citra Mas" }, "geometry": { "type": "Point", "coordinates": [ 117.478086717946113, 0.17066810245471 ] } },
+{ "type": "Feature", "properties": { "id": 16, "nama_halte": "Halte Nabilla" }, "geometry": { "type": "Point", "coordinates": [ 117.474124865743107, 0.170547545434071 ] } },
+{ "type": "Feature", "properties": { "id": 17, "nama_halte": "Halte Koramil" }, "geometry": { "type": "Point", "coordinates": [ 117.472200672608764, 0.170542817707756 ] } },
+{ "type": "Feature", "properties": { "id": 18, "nama_halte": "Halte Kayu Mas" }, "geometry": { "type": "Point", "coordinates": [ 117.468628859554656, 0.169909302371057 ] } },
+{ "type": "Feature", "properties": { "id": 19, "nama_halte": "Halte Awang Long Indah" }, "geometry": { "type": "Point", "coordinates": [ 117.463016295521939, 0.13603224642639 ] } },
+{ "type": "Feature", "properties": { "id": 14, "nama_halte": "Halte Perhubungan" }, "geometry": { "type": "Point", "coordinates": [ 117.483728658163074, 0.167282115567064 ] } },
+{ "type": "Feature", "properties": { "id": 20, "nama_halte": "Halte Amplang HOP V" }, "geometry": { "type": "Point", "coordinates": [ 117.461763972200657, 0.133936837854834 ] } },
+{ "type": "Feature", "properties": { "id": 23, "nama_halte": "Halte HOP II" }, "geometry": { "type": "Point", "coordinates": [ 117.469948282509321, 0.126505595443277 ] } },
+{ "type": "Feature", "properties": { "id": 24, "nama_halte": "Halte HOP I" }, "geometry": { "type": "Point", "coordinates": [ 117.469465567576634, 0.128042808846978 ] } },
+{ "type": "Feature", "properties": { "id": 21, "nama_halte": "Halte HOP VI" }, "geometry": { "type": "Point", "coordinates": [ 117.464635544946489, 0.137375272501836 ] } },
+{ "type": "Feature", "properties": { "id": 22, "nama_halte": "Halte HOP V" }, "geometry": { "type": "Point", "coordinates": [ 117.464486133181623, 0.130743706939851 ] } }
+]
+}

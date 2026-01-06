@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import { Search, MapPin, Bus, Layers, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, MapPin, Bus, Layers, ChevronDown, ChevronUp, CircleDot } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, schools = [], onSelectSchool, startPoint, selectedSchool, setSelectedSchool, onReset }) => {
+const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, schools = [], onSelectSchool, startPoint, selectedSchool, setSelectedSchool, onReset, routePreference, setRoutePreference, comparisonResults, onSelectResult, busTransportMode, onChangeBusMode }) => {
     const containerRef = useRef();
     const [isExpanded, setIsExpanded] = useState(true);
 
@@ -57,35 +57,43 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Layer Peta</h4>
 
                                 <div className="flex items-center justify-between group">
-                                    <Label htmlFor="zonasi" className="flex items-center gap-3 cursor-pointer text-slate-700 group-hover:text-emerald-600 transition-colors">
-                                        <div className="p-1.5 bg-red-100/50 rounded-lg text-red-500"><MapPin className="w-4 h-4" /></div>
-                                        Area Zonasi
+                                    <Label htmlFor="schoolAreas" className="flex items-center gap-3 cursor-pointer text-slate-700 group-hover:text-emerald-600 transition-colors">
+                                        <div className="p-1.5 bg-emerald-100/50 rounded-lg text-emerald-600"><MapPin className="w-4 h-4" /></div>
+                                        Area Sekolah
                                     </Label>
-                                    <Switch id="zonasi" checked={layersState.zones} onCheckedChange={() => toggleLayer('zones')} className="data-[state=checked]:bg-emerald-500" />
+                                    <Switch id="schoolAreas" checked={layersState.schoolAreas} onCheckedChange={() => toggleLayer('schoolAreas')} className="data-[state=checked]:bg-emerald-500" />
                                 </div>
 
                                 <div className="flex items-center justify-between group">
-                                    <Label htmlFor="bus" className="flex items-center gap-3 cursor-pointer text-slate-700 group-hover:text-emerald-600 transition-colors">
+                                    <Label htmlFor="busRoutes" className="flex items-center gap-3 cursor-pointer text-slate-700 group-hover:text-emerald-600 transition-colors">
                                         <div className="p-1.5 bg-amber-100/50 rounded-lg text-amber-500"><Bus className="w-4 h-4" /></div>
-                                        Rute Bus Sekolah
+                                        Rute Bus
                                     </Label>
-                                    <Switch id="bus" checked={layersState.bus} onCheckedChange={() => toggleLayer('bus')} className="data-[state=checked]:bg-emerald-500" />
+                                    <Switch id="busRoutes" checked={layersState.busRoutes} onCheckedChange={() => toggleLayer('busRoutes')} className="data-[state=checked]:bg-emerald-500" />
                                 </div>
 
                                 <div className="flex items-center justify-between group">
-                                    <Label htmlFor="angkot" className="flex items-center gap-3 cursor-pointer text-slate-700 group-hover:text-emerald-600 transition-colors">
-                                        <div className="p-1.5 bg-green-100/50 rounded-lg text-green-600"><Bus className="w-4 h-4" /></div>
-                                        Rute Angkot
+                                    <Label htmlFor="busStops" className="flex items-center gap-3 cursor-pointer text-slate-700 group-hover:text-emerald-600 transition-colors">
+                                        <div className="p-1.5 bg-blue-100/50 rounded-lg text-blue-500"><CircleDot className="w-4 h-4" /></div>
+                                        Halte Bus
                                     </Label>
-                                    <Switch id="angkot" checked={layersState.angkot} onCheckedChange={() => toggleLayer('angkot')} className="data-[state=checked]:bg-emerald-500" />
+                                    <Switch id="busStops" checked={layersState.busStops} onCheckedChange={() => toggleLayer('busStops')} className="data-[state=checked]:bg-emerald-500" />
                                 </div>
 
-                                <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-4 group">
-                                    <Label htmlFor="graph" className="flex items-center gap-3 cursor-pointer text-slate-400 text-xs uppercase font-bold tracking-wider group-hover:text-slate-600 transition-colors">
-                                        <div className="p-1.5 bg-slate-100 rounded-lg"><Layers className="w-3 h-3" /></div>
-                                        Debug Graph
+                                <div className="flex items-center justify-between group">
+                                    <Label htmlFor="roads" className="flex items-center gap-3 cursor-pointer text-slate-700 group-hover:text-emerald-600 transition-colors">
+                                        <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600"><Layers className="w-4 h-4" /></div>
+                                        Jalan Raya
                                     </Label>
-                                    <Switch id="graph" checked={layersState.graph} onCheckedChange={() => toggleLayer('graph')} />
+                                    <Switch id="roads" checked={layersState.roads} onCheckedChange={() => toggleLayer('roads')} className="data-[state=checked]:bg-emerald-500" />
+                                </div>
+
+                                <div className="flex items-center justify-between group">
+                                    <Label htmlFor="routingPoints" className="flex items-center gap-3 cursor-pointer text-slate-700 group-hover:text-emerald-600 transition-colors">
+                                        <div className="p-1.5 bg-red-100/50 rounded-lg text-red-600"><CircleDot className="w-4 h-4" /></div>
+                                        Titik Navigasi
+                                    </Label>
+                                    <Switch id="routingPoints" checked={layersState.routingPoints} onCheckedChange={() => toggleLayer('routingPoints')} className="data-[state=checked]:bg-emerald-500" />
                                 </div>
                             </div>
 
@@ -146,9 +154,156 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                     </CardHeader>
 
                     {isExpanded && (
-                        <CardContent className="p-5 pt-4 space-y-5">
-                            {/* Route Stats (Visible if route exists) */}
-                            {routeData && (
+                        <CardContent className="p-5 pt-4 space-y-5 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                            {/* Result Cards Logic */}
+                            {routeData && comparisonResults && (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Pilih Rute Perjalanan</div>
+
+                                    {/* 1. Walk Card */}
+                                    <div
+                                        className={`p-3 rounded-xl border cursor-pointer transition-all ${routeData === comparisonResults.walk
+                                            ? 'bg-emerald-50 border-emerald-500 shadow-md ring-1 ring-emerald-500'
+                                            : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30'}`}
+                                        onClick={() => comparisonResults.walk && onSelectResult(comparisonResults.walk)}
+                                    >
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600"><span className="text-lg">🚶</span></div>
+                                                <span className="font-bold text-slate-700 text-sm">Jalan Kaki</span>
+                                            </div>
+                                            {comparisonResults.walk ? (
+                                                <div className="text-right">
+                                                    <div className="font-black text-lg text-emerald-700">{Math.ceil(comparisonResults.walk.duration_minutes)} <span className="text-xs font-medium text-emerald-600/70">min</span></div>
+                                                </div>
+                                            ) : <span className="text-xs text-slate-400 italic">Terlalu Jauh</span>}
+                                        </div>
+                                        {comparisonResults.walk && (
+                                            <div className="text-xs text-slate-500 flex gap-3">
+                                                <span>{(comparisonResults.walk.distance_meters / 1000).toFixed(2)} km</span>
+                                                {comparisonResults.walk.distance_meters < 100 && <span className="text-emerald-600 font-bold">Recommended</span>}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 2. Private Vehicle Card */}
+                                    <div
+                                        className={`p-3 rounded-xl border cursor-pointer transition-all ${routeData === comparisonResults.private
+                                            ? 'bg-emerald-50 border-emerald-500 shadow-md ring-1 ring-emerald-500'
+                                            : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30'}`}
+                                        onClick={() => comparisonResults.private && onSelectResult(comparisonResults.private)}
+                                    >
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600"><span className="text-lg">🚗</span></div>
+                                                <span className="font-bold text-slate-700 text-sm">Kendaraan Pribadi</span>
+                                            </div>
+                                            {comparisonResults.private ? (
+                                                <div className="text-right">
+                                                    <div className="font-black text-lg text-emerald-700">{Math.ceil(comparisonResults.private.duration_minutes)} <span className="text-xs font-medium text-emerald-600/70">min</span></div>
+                                                </div>
+                                            ) : <span className="text-xs text-slate-400 italic">Tidak Tersedia</span>}
+                                        </div>
+                                        {comparisonResults.private && (
+                                            <div className="text-xs text-slate-500">
+                                                {(comparisonResults.private.distance_meters / 1000).toFixed(2)} km
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 3. Bus Card */}
+                                    <div
+                                        className={`p-3 rounded-xl border cursor-pointer transition-all ${routeData === comparisonResults.bus
+                                            ? 'bg-emerald-50 border-emerald-500 shadow-md ring-1 ring-emerald-500'
+                                            : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30'}`}
+                                        onClick={() => comparisonResults.bus && onSelectResult(comparisonResults.bus)}
+                                    >
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 bg-amber-100 rounded-lg text-amber-600"><span className="text-lg">🚌</span></div>
+                                                <span className="font-bold text-slate-700 text-sm">Bus Sekolah</span>
+                                            </div>
+                                            {comparisonResults.bus ? (
+                                                <div className="text-right">
+                                                    <div className="font-black text-lg text-emerald-700">{Math.ceil(comparisonResults.bus.duration_minutes)} <span className="text-xs font-medium text-emerald-600/70">min</span></div>
+                                                </div>
+                                            ) : <span className="text-xs text-red-400 italic font-semibold">Tidak Tersedia</span>}
+                                        </div>
+                                        {comparisonResults.bus ? (
+                                            <>
+                                                <div className="text-xs text-slate-500 mb-2">
+                                                    Ke Halte: <span className="font-semibold text-slate-700">{comparisonResults.bus.stopName}</span>
+                                                    <br />
+                                                    Naik Rute: <span className="font-semibold text-blue-600">{comparisonResults.bus.routeName}</span>
+                                                </div>
+
+                                                {/* Transport Mode Options to Bus Stop */}
+                                                {comparisonResults.bus.modeOptions && (
+                                                    <div className="space-y-1">
+                                                        <div className="text-[10px] font-semibold text-slate-400 uppercase">Ke Halte dengan:</div>
+                                                        <div className="grid grid-cols-3 gap-1">
+                                                            {/* Walking */}
+                                                            <div
+                                                                className={`rounded p-1.5 text-center border cursor-pointer transition-all ${busTransportMode === 'walk'
+                                                                    ? 'bg-emerald-100 border-emerald-500 ring-1 ring-emerald-500'
+                                                                    : 'bg-slate-50 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30'
+                                                                    }`}
+                                                                onClick={() => onChangeBusMode('walk')}
+                                                            >
+                                                                <div className="text-xs">🚶</div>
+                                                                <div className="text-[10px] font-semibold text-slate-600">Jalan</div>
+                                                                <div className="text-[9px] text-slate-500">
+                                                                    {Math.ceil(comparisonResults.bus.modeOptions.walk.duration)} min
+                                                                    <br />
+                                                                    {(comparisonResults.bus.modeOptions.walk.distance / 1000).toFixed(1)} km
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Car */}
+                                                            <div
+                                                                className={`rounded p-1.5 text-center border cursor-pointer transition-all ${busTransportMode === 'car'
+                                                                    ? 'bg-blue-100 border-blue-500 ring-1 ring-blue-500'
+                                                                    : 'bg-slate-50 border-slate-200 hover:border-blue-300 hover:bg-blue-50/30'
+                                                                    }`}
+                                                                onClick={() => onChangeBusMode('car')}
+                                                            >
+                                                                <div className="text-xs">🚗</div>
+                                                                <div className="text-[10px] font-semibold text-slate-600">Mobil</div>
+                                                                <div className="text-[9px] text-slate-500">
+                                                                    {Math.ceil(comparisonResults.bus.modeOptions.car.duration)} min
+                                                                    <br />
+                                                                    {(comparisonResults.bus.modeOptions.car.distance / 1000).toFixed(1)} km
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Motorcycle */}
+                                                            <div
+                                                                className={`rounded p-1.5 text-center border cursor-pointer transition-all ${busTransportMode === 'motor'
+                                                                    ? 'bg-purple-100 border-purple-500 ring-1 ring-purple-500'
+                                                                    : 'bg-slate-50 border-slate-200 hover:border-purple-300 hover:bg-purple-50/30'
+                                                                    }`}
+                                                                onClick={() => onChangeBusMode('motor')}
+                                                            >
+                                                                <div className="text-xs">🏍️</div>
+                                                                <div className="text-[10px] font-semibold text-slate-600">Motor</div>
+                                                                <div className="text-[9px] text-slate-500">
+                                                                    {Math.ceil(comparisonResults.bus.modeOptions.motor.duration)} min
+                                                                    <br />
+                                                                    {(comparisonResults.bus.modeOptions.motor.distance / 1000).toFixed(1)} km
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : <div className="text-[10px] text-slate-400">Tidak ada rute bus</div>}
+                                    </div>
+
+                                </div>
+                            )}
+
+                            {/* Legacy Route Stats (Only show if we have route data but NOT comparison results - e.g. legacy state) */}
+                            {routeData && !comparisonResults && (
                                 <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="bg-emerald-50/80 border border-emerald-100 rounded-xl p-3 flex flex-col items-center justify-center text-center">
                                         <div className="text-[10px] text-emerald-600/70 font-bold uppercase tracking-wider mb-1">Jarak</div>
@@ -163,25 +318,35 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                 </div>
                             )}
 
+                            {/* Warning for Last Mile */}
+                            {routeData && routeData.requiresWalking && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex gap-2 items-start animate-in fade-in zoom-in-95">
+                                    <span className="text-lg">🚶</span>
+                                    <div>
+                                        <strong>Akses Terbatas:</strong> Kendaraan mungkin tidak dapat mencapai titik tepat. Silakan lanjutkan dengan berjalan kaki.
+                                    </div>
+                                </div>
+                            )}
+
                             <Tabs defaultValue="route" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2 h-10 mb-4 bg-slate-100/80 p-1 rounded-xl">
+                                <TabsList className="grid w-full grid-cols-2 h-10 mb-0 bg-slate-100/80 p-1 rounded-xl">
                                     <TabsTrigger value="info" className="text-xs font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">Info</TabsTrigger>
                                     <TabsTrigger value="route" className="text-xs font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">Rute</TabsTrigger>
                                 </TabsList>
 
-                                <TabsContent value="info" className="text-sm text-slate-600 min-h-[100px] flex flex-col items-center justify-center text-center px-4 space-y-2 animate-in fade-in zoom-in-95">
-                                    <MapPin className="w-8 h-8 text-slate-300 mb-2" />
-                                    <p>Klik marker sekolah di peta untuk melihat detail zonasi dan info lainnya.</p>
+                                <TabsContent value="info" className="mt-0 animate-in fade-in zoom-in-95">
+                                    <div className="text-sm text-slate-600 min-h-[100px] flex flex-col items-center justify-center text-center px-4 space-y-2">
+                                        <MapPin className="w-8 h-8 text-slate-300 mb-2" />
+                                        <p>Klik marker sekolah di peta untuk melihat detail zonasi dan info lainnya.</p>
+                                    </div>
                                 </TabsContent>
 
-                                <TabsContent value="route" className="space-y-3 animate-in fade-in zoom-in-95">
-                                    <div className="relative pl-6 space-y-4">
-                                        {/* Line Connector */}
-                                        <div className="absolute left-[11px] top-3 bottom-8 w-0.5 bg-slate-200 -z-10" />
+                                <TabsContent value="route" className="mt-0 animate-in fade-in zoom-in-95">
+                                    <div className="relative pl-6 flex flex-col gap-4">
 
                                         {/* FROM Input */}
                                         <div className="relative group">
-                                            <div className="absolute -left-6 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-[3px] border-blue-500 bg-white shadow-sm ring-4 ring-blue-500/10 transition-all group-hover:scale-110 group-hover:border-blue-600"></div>
+                                            <div className="absolute -left-[18px] top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-[3px] border-blue-500 bg-white shadow-sm ring-4 ring-blue-500/10 transition-all group-hover:scale-110 group-hover:border-blue-600"></div>
                                             <div className="p-3 bg-slate-50/50 hover:bg-white rounded-xl border border-slate-100/80 hover:border-blue-200/50 flex flex-col justify-center transition-all duration-300 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_-4px_rgba(59,130,246,0.1)]">
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Lokasi Awal</p>
                                                 <p className="text-sm font-semibold text-slate-700 truncate">
@@ -194,9 +359,9 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                             </div>
                                         </div>
 
-                                        {/* TO Input */}
+                                        {/* Target School Select */}
                                         <div className="relative group">
-                                            <div className="absolute -left-6 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-[3px] border-emerald-500 bg-white shadow-sm ring-4 ring-emerald-500/10 transition-all group-hover:scale-110 group-hover:border-emerald-600"></div>
+                                            <div className="absolute -left-[18px] top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-[3px] border-emerald-500 bg-white shadow-sm ring-4 ring-emerald-500/10 transition-all group-hover:scale-110 group-hover:border-emerald-600"></div>
                                             <div className="p-3 bg-slate-50/50 hover:bg-white rounded-xl border border-slate-100/80 hover:border-emerald-200/50 flex flex-col justify-center transition-all duration-300 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_-4px_rgba(16,185,129,0.1)]">
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Tujuan Sekolah</p>
                                                 <select
@@ -218,7 +383,36 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                                 </select>
                                             </div>
                                         </div>
+
+                                        {/* Route Preference */}
+                                        <div className="flex gap-2 items-center text-xs font-semibold text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <span className="text-[10px] uppercase font-bold tracking-wider mr-1">Tipe:</span>
+                                            <div className="flex gap-1 flex-1">
+                                                <button
+                                                    onClick={() => setRoutePreference && setRoutePreference('recommended')}
+                                                    className={`flex-1 py-1 px-2 rounded-md text-[10px] transition-all border ${routePreference === 'recommended'
+                                                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm'
+                                                        : 'bg-white text-slate-500 border-transparent hover:bg-slate-100'}`}
+                                                >
+                                                    Terbaik
+                                                </button>
+                                                <button
+                                                    onClick={() => setRoutePreference && setRoutePreference('shortest')}
+                                                    className={`flex-1 py-1 px-2 rounded-md text-[10px] transition-all border ${routePreference === 'shortest'
+                                                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm'
+                                                        : 'bg-white text-slate-500 border-transparent hover:bg-slate-100'}`}
+                                                >
+                                                    Terpendek
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Line Connector (Moved to end to preserve z-index but fix spacing flow) */}
+                                        <div className="absolute left-[11px] top-3 bottom-14 w-0.5 bg-slate-200 -z-10" />
+
                                     </div>
+
+
 
                                     <div className="flex gap-2 pt-2">
                                         <Button
@@ -241,7 +435,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                     )}
                 </Card>
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -25,18 +25,18 @@ enum RouteType {
 
 // --- GIS MODELS ---
 
-// 1. Sekolah (Marker)
 model School {
   id          Int        @id @default(autoincrement())
   name        String     @unique @db.VarChar(100)
   type        SchoolType
-  address     String     @db.Text
-  latitude    Float
-  longitude   Float
-  photoUrl    String?    @map("photo_url")
+  address     String?    @db.Text
   description String?    @db.Text
 
-  zones Zone[]
+  // Spatial Data (Native MySQL Types with SRID 4326)
+  location Unsupported("POINT")
+  area     Unsupported("POLYGON")
+
+  busRoutes BusRoute[] // Routes that serve this school
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -44,58 +44,37 @@ model School {
   @@map("schools")
 }
 
-// 2. Zonasi (Polygon)
-model Zone {
-  id          Int    @id @default(autoincrement())
+model BusStop {
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(100)
+  address     String? @db.Text
+  description String? @db.Text
+
+  // Spatial Data
+  location Unsupported("POINT")
+  area     Unsupported("POLYGON")
+
+  generatedRoutes BusRoute[] // Relation to routes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bus_stops")
+}
+
+model BusRoute {
+  id          Int     @id @default(autoincrement())
   name        String
-  color       String @db.VarChar(7)
-  coordinates Json   // GeoJSON Polygon [[lat,lng], ...]
+  color       String  @db.VarChar(7)
+  pathData    Json // GeoJSON LineString for the visual route
+  schedule    Json? // Store schedule info e.g. { departure: "06:00", return: "14:00" }
+  description String? @db.Text
 
-  schoolId Int    @map("school_id")
-  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  busStops BusStop[]
+  schools  School[] // Schools served by this route
 
-  @@map("zones")
-}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-// 3. Rute Visual (Untuk Layer Statis di Peta)
-model Route {
-  id          Int       @id @default(autoincrement())
-  name        String
-  type        RouteType
-  color       String    @db.VarChar(7)
-  pathData    Json      // GeoJSON LineString
-  description String?   @db.Text
-
-  @@map("routes")
-}
-
-// --- PATHFINDING MODELS (Untuk Algoritma A*) ---
-
-// 4. Node Graph (Titik Persimpangan)
-model GraphNode {
-  id        Int    @id // ID manual dari sample_nodes.geojson
-  label     String?
-  latitude  Float
-  longitude Float
-
-  edgesFrom GraphEdge[] @relation("SourceNode")
-  edgesTo   GraphEdge[] @relation("TargetNode")
-
-  @@map("graph_nodes")
-}
-
-// 5. Edge Graph (Garis Jalan Antar Node)
-model GraphEdge {
-  id Int @id @default(autoincrement())
-
-  sourceId Int
-  source   GraphNode @relation("SourceNode", fields: [sourceId], references: [id])
-
-  targetId Int
-  target   GraphNode @relation("TargetNode", fields: [targetId], references: [id])
-
-  weight   Float // Jarak dalam meter (Cost)
-  geometry Json? // Bentuk jalan (LineString)
-
-  @@map("graph_edges")
+  @@map("bus_routes")
 }

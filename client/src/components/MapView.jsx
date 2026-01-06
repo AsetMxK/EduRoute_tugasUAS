@@ -64,38 +64,14 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     return R * c;
 };
 
-// Helper component to handle map clicks with Snapping
-function ClickHandler({ setStartPoint, graphNodes }) {
+// Helper component to handle map clicks with Snapping (Simplified for ORS: No Graph Snapping)
+function ClickHandler({ setStartPoint }) {
     useMapEvents({
         click(e) {
             const { lat, lng } = e.latlng;
-
-            // 1. Try to snap to nearest GraphNode if available
-            if (graphNodes && graphNodes.length > 0) {
-                let bestNode = null;
-                let minDst = Infinity;
-
-                // Find nearest (O(N) is fine for ~1500 nodes)
-                for (const node of graphNodes) {
-                    const d = calculateDistance(lat, lng, node.latitude, node.longitude);
-                    if (d < minDst) {
-                        minDst = d;
-                        bestNode = node;
-                    }
-                }
-
-                // Threshold: Only snap if within reasonable distance (e.g., 500m)
-                if (bestNode && minDst < 1000) {
-                    setStartPoint({ lat: bestNode.latitude, lng: bestNode.longitude, nodeId: bestNode.id });
-                    toast.success(`Snapped to nearest Node #${bestNode.id} (${Math.round(minDst)}m away)`);
-                } else {
-                    // Fallback
-                    setStartPoint({ lat, lng, nodeId: null });
-                    toast("Lokasi diset manual (jauh dari node)");
-                }
-            } else {
-                setStartPoint({ lat, lng, nodeId: null });
-            }
+            // Direct set without snapping to graph nodes
+            setStartPoint({ lat, lng, nodeId: null });
+            // toast("Lokasi diset"); 
         },
     });
     return null;
@@ -122,13 +98,15 @@ const MapController = ({ startPoint, selectedSchool }) => {
     return null;
 };
 
-const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [], graphNodes = [], graphEdges = [], startPoint, setStartPoint, selectedSchool, setSelectedSchool, onFindRoute }) => {
+
+
+const MapView = ({ layersState, currentRoutePath = [], routeData = null, lastMilePath = null, schools = [], schoolAreas = [], busStops = [], busStopAreas = [], busRoutes = [], roads = null, startPoint, setStartPoint, selectedSchool, setSelectedSchool, onFindRoute }) => {
 
     return (
         <div className="h-full w-full z-0 relative">
             <MapContainer
                 center={[0.1347, 117.4980]}
-                zoom={13}
+                zoom={14}
                 style={{ height: "100%", width: "100%" }}
                 zoomControl={false}
             >
@@ -138,73 +116,204 @@ const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [],
                 />
 
                 <MapController startPoint={startPoint} selectedSchool={selectedSchool} />
-                <ClickHandler setStartPoint={setStartPoint} graphNodes={graphNodes} />
+                <ClickHandler setStartPoint={setStartPoint} />
+
+                {/* Render Streets / Roads */}
+                {layersState.roads && roads && roads.features && roads.features.map((feature, idx) => {
+                    const geometry = feature.geometry;
+                    if (geometry.type === 'MultiLineString') {
+                        return geometry.coordinates.map((segment, segIdx) => (
+                            <Polyline
+                                key={`road-${idx}-${segIdx}`}
+                                positions={segment.map(coord => [coord[1], coord[0]])}
+                                pathOptions={{ color: '#475569', weight: 4, opacity: 0.9 }}
+                            />
+                        ));
+                    } else if (geometry.type === 'LineString') {
+                        return (
+                            <Polyline
+                                key={`road-${idx}`}
+                                positions={geometry.coordinates.map(coord => [coord[1], coord[0]])}
+                                pathOptions={{ color: '#475569', weight: 4, opacity: 0.9 }}
+                            />
+                        );
+                    }
+                    return null;
+                })}
+
+                {/* Debug Layer: Navigation Points */}
+                {layersState.routingPoints && schools.map((school, idx) => {
+                    const routingLoc = school.properties.routingLocation;
+                    if (!routingLoc) return null;
+                    const [lon, lat] = routingLoc.coordinates;
+                    return (
+                        <CircleMarker
+                            key={`debug-nav-point-${idx}`}
+                            center={[lat, lon]}
+                            radius={4}
+                            pathOptions={{
+                                color: '#ffffff',
+                                weight: 2,
+                                fillColor: '#ef4444', // Red-500
+                                fillOpacity: 0.9
+                            }}
+                        >
+                            <Popup className="text-xs font-bold text-red-600">
+                                Titik Navigasi (Gate)<br />{school.properties.name}
+                            </Popup>
+                        </CircleMarker>
+                    );
+                })}
+
+                {/* --- NEW LAYERS --- */}
+
+                {/* 1. School Areas (Polygons) */}
+                {layersState.schoolAreas && schoolAreas.map((area, idx) => (
+                    <Polygon
+                        key={`school-area-${idx}`}
+                        positions={area.geometry.coordinates[0].map(coord => [coord[1], coord[0]])} // GeoJSON [lon, lat] -> Leaflet [lat, lon]
+                        pathOptions={{
+                            color: '#10b981',
+                            fillColor: '#10b981',
+                            fillOpacity: 0.2,
+                            weight: 2,
+                        }}
+                    >
+                        <Popup className="text-sm font-bold text-emerald-700">Area {area.properties.name}</Popup>
+                    </Polygon>
+                ))}
+
+                {/* 2. Bus Bus Stop Areas (Polygons) */}
+                {layersState.busStops && busStopAreas.map((area, idx) => (
+                    <Polygon
+                        key={`stop-area-${idx}`}
+                        positions={area.geometry.coordinates[0].map(coord => [coord[1], coord[0]])}
+                        pathOptions={{
+                            color: '#3b82f6',
+                            fillColor: '#3b82f6',
+                            fillOpacity: 0.2,
+                            weight: 1,
+                            dashArray: '4, 4'
+                        }}
+                    >
+                        <Popup className="text-xs">Area Halte {area.properties.name}</Popup>
+                    </Polygon>
+                ))}
+
+                {/* 3. Bus Routes (Lines) */}
+                {layersState.busRoutes && busRoutes.map((route, idx) => (
+                    <Polyline
+                        key={`bus-route-${idx}`}
+                        positions={route.geometry.type === 'MultiLineString'
+                            ? route.geometry.coordinates.map(segment => segment.map(coord => [coord[1], coord[0]]))
+                            : route.geometry.coordinates.map(coord => [coord[1], coord[0]])
+                        }
+                        pathOptions={{
+                            color: route.properties.color || '#f59e0b',
+                            weight: 5,
+                            opacity: 0.8,
+                            lineCap: 'round',
+                            lineJoin: 'round'
+                        }}
+                    >
+                        <Popup>
+                            <div className="text-sm">
+                                <b className="text-amber-700 block">{route.properties.name}</b>
+                                <span className="text-xs text-slate-500">{route.properties.description}</span>
+                            </div>
+                        </Popup>
+                    </Polyline>
+                ))}
+
+                {/* 4. Bus Stops (Markers) */}
+                {layersState.busStops && busStops.map((stop, idx) => (
+                    <CircleMarker
+                        key={`stop-marker-${idx}`}
+                        center={[stop.geometry.coordinates[1], stop.geometry.coordinates[0]]}
+                        radius={6}
+                        pathOptions={{
+                            color: '#ffffff',
+                            weight: 2, // Border around the dot
+                            fillColor: '#3b82f6', // Blue dot
+                            fillOpacity: 1
+                        }}
+                    >
+                        <Popup>
+                            <strong>🚏 {stop.properties.name}</strong><br />
+                            <span className="text-xs text-slate-500">{stop.properties.address}</span>
+                        </Popup>
+                    </CircleMarker>
+                ))}
 
                 {/* User Location Marker */}
                 {startPoint && (
                     <Marker position={[startPoint.lat, startPoint.lng]} icon={startIcon}>
                         <Popup>
                             <strong>Lokasi Anda (Start)</strong><br />
-                            {startPoint.nodeId ? `Node ID: ${startPoint.nodeId}` : 'Koordinat Manual'}
+                            Koordinat: {startPoint.lat.toFixed(5)}, {startPoint.lng.toFixed(5)}
                         </Popup>
                     </Marker>
                 )}
 
-                {/* Route Path (A* Result) */}
-                {currentRoutePath && currentRoutePath.length > 0 && (
-                    <Polyline positions={currentRoutePath} color="#3b82f6" weight={6} opacity={0.8} dashArray="10, 10" />
-                )}
-
-                {/* --- GRAPH VIZ LAYER (DEBUG) --- */}
-                {layersState.graph && (
+                {/* Route Path - Different colors for Bus vs Normal */}
+                {routeData && routeData.isBusRoute ? (
                     <>
-                        {/* 1. Edges (Lines) */}
-                        {graphEdges.map((edge, idx) => {
-                            let positions = [];
-                            if (edge.geometry && edge.geometry.coordinates && Array.isArray(edge.geometry.coordinates)) {
-                                positions = edge.geometry.coordinates.map(p => [p[1], p[0]]);
-                            } else if (Array.isArray(edge.geometry)) {
-                                positions = edge.geometry.map(p => [p[1], p[0]]);
-                            }
-                            return <Polyline key={`edge-${idx}`} positions={positions} pathOptions={{ color: '#94a3b8', weight: 2, opacity: 0.5 }} />;
-                        })}
-
-                        {/* 2. Nodes (Points) */}
-                        {graphNodes.map((node, idx) => (
-                            <CircleMarker
-                                key={`node-${idx}`}
-                                center={[node.latitude, node.longitude]}
-                                radius={4}
-                                pathOptions={{ color: '#475569', fillColor: '#cbd5e1', fillOpacity: 0.8, weight: 1 }}
-                                eventHandlers={{
-                                    click: () => {
-                                        toast.success(`Start Point set to Node #${node.id}`);
-                                        setStartPoint({ lat: node.latitude, lng: node.longitude, nodeId: node.id });
-                                    }
+                        {/* Walking segment to bus stop */}
+                        {routeData.walkPath && (
+                            <Polyline
+                                positions={routeData.walkPath}
+                                pathOptions={{
+                                    color: '#10b981', // Emerald green for walking
+                                    weight: 5,
+                                    opacity: 0.8
                                 }}
                             >
-                                <Popup>Node ID: {node.id}</Popup>
-                            </CircleMarker>
-                        ))}
+                                <Popup>🚶 Jalan Kaki ke Halte</Popup>
+                            </Polyline>
+                        )}
+                        {/* Bus route line */}
+                        {routeData.busLinePath && (
+                            <Polyline
+                                positions={routeData.busLinePath}
+                                pathOptions={{
+                                    color: '#f59e0b', // Amber/Orange for bus
+                                    weight: 6,
+                                    opacity: 0.9,
+                                    dashArray: '15, 10'
+                                }}
+                            >
+                                <Popup>🚌 Jalur Bus Sekolah</Popup>
+                            </Polyline>
+                        )}
                     </>
+                ) : (
+                    /* Normal route (walk or drive to school directly) */
+                    currentRoutePath && currentRoutePath.length > 0 && (
+                        <Polyline
+                            positions={currentRoutePath}
+                            pathOptions={{
+                                color: '#3b82f6', // Blue for normal routes
+                                weight: 6,
+                                opacity: 0.8
+                            }}
+                        />
+                    )
                 )}
 
-                {/* Render Zones (Polygon) */}
-                {layersState.zones && zones.map((zone, idx) => (
-                    <Polygon
-                        key={`zone-${idx}`}
-                        positions={zone.geometry.coordinates[0].map(coord => [coord[1], coord[0]])}
+                {/* Last Mile Path (Walking Segment) */}
+                {lastMilePath && (
+                    <Polyline
+                        positions={lastMilePath}
                         pathOptions={{
-                            color: zone.properties.color || '#10b981',
-                            fillColor: zone.properties.color || '#10b981',
-                            fillOpacity: 0.15,
-                            weight: 1.5,
-                            dashArray: '5, 5'
+                            color: '#10b981', // Emerald for walking
+                            weight: 4,
+                            opacity: 0.8,
+                            dashArray: '10, 10'
                         }}
                     >
-                        <Popup>{zone.properties.name}</Popup>
-                    </Polygon>
-                ))}
+                        <Popup className="text-sm font-bold text-emerald-700">Lanjutkan Jalan Kaki</Popup>
+                    </Polyline>
+                )}
 
                 {/* Render Schools (Markers) */}
                 {schools.map((school, idx) => {
@@ -219,7 +328,17 @@ const MapView = ({ layersState, currentRoutePath = [], schools = [], zones = [],
                                         className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm w-full hover:bg-emerald-700 transition shadow-md font-semibold"
                                         onClick={() => {
                                             if (setSelectedSchool) setSelectedSchool(school);
-                                            if (onFindRoute) onFindRoute(school);
+                                            // Use routingLocation if available (passed from backend for precise point), else fallback to visual geometry
+                                            // onFindRoute expects a school object, but we need to ensure it uses the correct coordinates.
+                                            // We can modify onFindRoute or Create a synthetic object.
+                                            // Assuming onFindRoute extracts coordinates from geometry.
+                                            // Let's modify the object passed to onFindRoute.
+                                            const navigationTarget = {
+                                                ...school,
+                                                geometry: school.properties.routingLocation || school.geometry
+                                            };
+
+                                            if (onFindRoute) onFindRoute(navigationTarget);
                                         }}
                                     >
                                         Navigasi ke Sini
