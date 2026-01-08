@@ -294,22 +294,28 @@ app.post('/api/ors/directions', async (req, res) => {
     }
 
     try {
-        // Construct URL based on profile
-        const orsUrl = `https://api.openrouteservice.org/v2/directions/${profile}`;
+        // Switch to POST standard for better options (radiuses)
+        const orsUrl = `https://api.openrouteservice.org/v2/directions/${profile}/geojson`;
 
-        const response = await axios.get(
+        const response = await axios.post(
             orsUrl,
             {
-                params: {
-                    api_key: ORS_API_KEY,
-                    start: `${startLon},${startLat}`,
-                    end: `${endLon},${endLat}`,
-                    preference: preference
-                },
+                coordinates: [
+                    [parseFloat(startLon), parseFloat(startLat)],
+                    [parseFloat(endLon), parseFloat(endLat)]
+                ],
+                radiuses: [5000, 5000], // Look for road within 5km (Super lenient)
+                preference: preference
+            },
+            {
+                headers: {
+                    'Authorization': ORS_API_KEY,
+                    'Content-Type': 'application/json'
+                }
             }
         );
 
-        // ORS returns GeoJSON feature collection for route
+        // ORS returns GeoJSON feature collection
         res.json(response.data);
     } catch (error) {
         console.error('Error finding path with ORS:', error.response?.data || error.message);
@@ -324,36 +330,193 @@ app.post('/api/ors/directions', async (req, res) => {
     }
 });
 
-// Endpoint 3: Get all schools (simple list)
-app.get('/api/schools', async (req, res) => {
+// Endpoint 4: Find Nearest Terminals/Bus Stops
+app.get('/api/nearest-terminals', async (req, res) => {
+    const { lat, lon, limit = 5, schoolId } = req.query;
+
+    if (!lat || !lon) {
+        return res.status(400).json({ error: 'Missing lat/lon parameters' });
+    }
+
     try {
-        const schools = await prisma.school.findMany({
-            select: {
-                id: true,
-                name: true,
-                type: true,
-                address: true,
-                latitude: true,
-                longitude: true,
-                description: true,
-            },
+        const userLat = parseFloat(lat);
+        const userLon = parseFloat(lon);
+        const resultLimit = parseInt(limit);
+
+        // Fetch all bus stops with their locations and route associations
+        const busStopsRaw = await prisma.$queryRaw`
+            SELECT bs.id, bs.name, bs.address, bs.description,
+            ST_AsGeoJSON(bs.location) as location,
+            ST_X(bs.location) as lat,
+            ST_Y(bs.location) as lon,
+            GROUP_CONCAT(DISTINCT brtbs.A) as route_ids
+            FROM bus_stops bs
+            LEFT JOIN _BusRouteToBusStop brtbs ON bs.id = brtbs.B
+            GROUP BY bs.id
+        `;
+
+        // If schoolId is provided, get the routes that serve this school
+        let schoolRouteIds = [];
+        if (schoolId) {
+            const schoolRoutes = await prisma.$queryRaw`
+                SELECT A as routeId FROM _BusRouteToSchool WHERE B = ${parseInt(schoolId)}
+            `;
+            schoolRouteIds = schoolRoutes.map(r => r.routeId);
+        }
+
+        // Calculate distance and filter
+        const calculateHaversine = (lat1, lon1, lat2, lon2) => {
+            const R = 6371e3; // meters
+            const rad = Math.PI / 180;
+            const dLat = (lat2 - lat1) * rad;
+            const dLon = (lon2 - lon1) * rad;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * rad) * Math.cos(lat2 * rad) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        };
+
+        let terminals = busStopsRaw.map(stop => {
+            const stopRouteIds = stop.route_ids ? stop.route_ids.split(',').map(Number) : [];
+
+            // Handle location - may be object or string depending on driver
+            let locationObj = null;
+            if (stop.location) {
+                locationObj = typeof stop.location === 'string' ? JSON.parse(stop.location) : stop.location;
+            }
+
+            return {
+                id: stop.id,
+                name: stop.name,
+                address: stop.address,
+                description: stop.description,
+                location: locationObj,
+                routeIds: stopRouteIds,
+                distance_meters: Math.round(calculateHaversine(userLat, userLon, parseFloat(stop.lat), parseFloat(stop.lon)))
+            };
         });
-        res.json(schools);
+
+        // Filter by school routes if schoolId provided
+        if (schoolId && schoolRouteIds.length > 0) {
+            terminals = terminals.filter(t =>
+                t.routeIds.some(rid => schoolRouteIds.includes(rid))
+            );
+        }
+
+        // Sort by distance and limit
+        terminals.sort((a, b) => a.distance_meters - b.distance_meters);
+
+        // Filter by radius if provided
+        if (req.query.radius) {
+            const radius = parseFloat(req.query.radius); // meters
+            terminals = terminals.filter(t => t.distance_meters <= radius);
+        }
+
+        terminals = terminals.slice(0, resultLimit);
+
+        res.json({
+            success: true,
+            terminals: terminals
+        });
+
     } catch (error) {
-        console.error('Error fetching schools:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        console.error('Error finding nearest terminals:', error);
+        res.status(500).json({ error: 'Server error finding terminals' });
+    }
+});
+
+// Endpoint: Snap to Nearest Road Node
+app.get('/api/nearest-node', async (req, res) => {
+    try {
+        const { lat, lon } = req.query;
+        if (!lat || !lon) {
+            return res.status(400).json({ error: 'Missing lat/lon' });
+        }
+
+        const userLat = parseFloat(lat);
+        const userLon = parseFloat(lon);
+
+        const fs = require('fs');
+        const path = require('path');
+        const CACHE_FILE = path.join(__dirname, '../roads.cache.json');
+
+        let roadFeatures = [];
+        if (fs.existsSync(CACHE_FILE)) {
+            const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+            roadFeatures = data.features;
+        } else {
+            // If no cache, we can't snap easily without fetching overpass which is slow
+            // For now, return the point itself as fallback or error
+            // Or trigger the fetch (but that's async and long)
+            // Let's assume cache exists or return original point with warning
+            return res.json({
+                snapped: false,
+                original: { lat: userLat, lon: userLon },
+                message: "Road data not cached yet. Visit /api/roads to prime cache."
+            });
+        }
+
+        // Find nearest point
+        let minDis = Infinity;
+        let nearestPoint = null;
+
+        const calculateDistSq = (lat1, lon1, lat2, lon2) => {
+            return (lat1 - lat2) ** 2 + (lon1 - lon2) ** 2;
+        };
+
+        roadFeatures.forEach(feature => {
+            if (feature.geometry.type === 'LineString') {
+                feature.geometry.coordinates.forEach(coord => {
+                    const [rLon, rLat] = coord;
+                    const d = calculateDistSq(userLat, userLon, rLat, rLon);
+                    if (d < minDis) {
+                        minDis = d;
+                        nearestPoint = { lat: rLat, lon: rLon };
+                    }
+                });
+            }
+        });
+
+        if (nearestPoint) {
+            // Calculate actual meters for display
+            // Haversine
+            const R = 6371e3;
+            const rad = Math.PI / 180;
+            const dLat = (nearestPoint.lat - userLat) * rad;
+            const dLon = (nearestPoint.lon - userLon) * rad;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(userLat * rad) * Math.cos(nearestPoint.lat * rad) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distanceMeters = R * c;
+
+            res.json({
+                snapped: true,
+                node: nearestPoint,
+                distance_meters: distanceMeters
+            });
+        } else {
+            res.json({ snapped: false, original: { lat: userLat, lon: userLon } });
+        }
+
+    } catch (e) {
+        console.error("Error finding nearest node:", e);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`🚀 EduRoute Bontang Server berjalan di http://localhost:${PORT}`);
-    console.log(`📍 API Endpoints:`);
-    console.log(`   GET  /api/health          - Health check`);
-    console.log(`   GET  /api/gis-data        - Get schools & zones GeoJSON`);
-    console.log(`   GET  /api/roads           - Get street data (Overpass API)`);
-    console.log(`   POST /api/ors/directions  - Proxy to OpenRouteService`);
-    console.log(`   GET  /api/schools         - Get all schools`);
+    console.log(`EduRoute Bontang Server running at http://localhost:${PORT}`);
+    console.log(`API Endpoints:`);
+    console.log(`   GET  /api/health            - Health check`);
+    console.log(`   GET  /api/gis-data          - Get schools & zones GeoJSON`);
+    console.log(`   GET  /api/roads             - Get street data (Overpass API)`);
+    console.log(`   POST /api/ors/directions    - Proxy to OpenRouteService`);
+    console.log(`   GET  /api/schools           - Get all schools`);
+    console.log(`   GET  /api/nearest-terminals - Find nearest bus stops`);
+    console.log(`   GET  /api/nearest-node      - Snap lat/lon to nearest road node`);
 });
 
 // Graceful shutdown

@@ -100,15 +100,17 @@ const App = () => {
     setRouteData(updatedBusData);
   };
 
-  // Centralized Route Finding Logic (Multi-Mode)
+  const [nearestTerminal, setNearestTerminal] = useState(null);
+
+  // Centralized Route Finding Logic - Find Bus Route for School (No User Location Needed)
   const handleFindRoute = async (targetSchool) => {
     if (!startPoint) {
-      alert("Lokasi Anda belum ditentukan! Klik pada peta.");
+      toast.error("Lokasi Anda belum ditentukan! Klik pada peta untuk set lokasi pointer.");
       return;
     }
 
     if (!targetSchool) {
-      alert("Pilih sekolah tujuan terlebih dahulu!");
+      toast.error("Pilih sekolah tujuan terlebih dahulu!");
       return;
     }
 
@@ -132,7 +134,32 @@ const App = () => {
     };
 
     const distToSchool = calculateDist(userLat, userLon, schoolLat, schoolLon);
-    toast.info(`Mencari 3 Rute Alternatif...`, { duration: 2000 });
+    toast.info(`Mencari Rute & Terminal Terdekat...`, { duration: 2000 });
+
+    let apiNearestTerminal = null;
+
+    // 1. Find Nearest Terminal Logic
+    try {
+      const terminalRes = await axios.get('http://localhost:5000/api/nearest-terminals', {
+        params: {
+          lat: userLat,
+          lon: userLon,
+          schoolId: targetSchool.properties.id,
+          limit: 1,
+          radius: 3000 // Mencari dalam radius 3km dari titik (node) user
+        }
+      });
+
+      if (terminalRes.data.terminals.length > 0) {
+        apiNearestTerminal = terminalRes.data.terminals[0];
+        setNearestTerminal(apiNearestTerminal);
+        toast.success(`Ditemukan Terminal: ${apiNearestTerminal.name}`);
+      } else {
+        setNearestTerminal(null);
+      }
+    } catch (e) {
+      console.error("Error finding terminal", e);
+    }
 
     const fetchDirectRoute = async (profile) => {
       try {
@@ -173,41 +200,35 @@ const App = () => {
     // 3. Smart Bus Option (Route to Stop + Display Bus Line)
     const busPromise = (async () => {
       // 1. Check if target school has any serving bus routes
-      const schoolRouteIds = selectedSchool.properties.routeIds || [];
+      const schoolRouteIds = targetSchool.properties.routeIds || [];
       if (schoolRouteIds.length === 0) {
-        console.log("This school has no bus routes serving it.");
-        return null;
+        console.warn("School has no bus routes");
+        return null; // Silent fail for bus, will fall back to walk
       }
 
-      // 2. Filter bus stops that belong to these school routes
-      const validStops = busStops.filter(stop => {
-        const stopRouteIds = stop.properties.routeIds || [];
-        // Check if this stop serves any of the school's routes
-        return stopRouteIds.some(rid => schoolRouteIds.includes(rid));
-      });
-
-      if (validStops.length === 0) {
-        console.log("No bus stops found for this school's routes.");
-        return null;
-      }
-
-      // 3. Find nearest valid stop to User
       let nearestStop = null;
-      let minDist = Infinity;
 
-      validStops.forEach(stop => {
-        const [lon, lat] = stop.geometry.coordinates;
-        const d = calculateDist(userLat, userLon, lat, lon);
-        if (d < minDist) {
-          minDist = d;
-          nearestStop = stop;
-        }
-      });
+      // 2. Use API result if available
+      if (apiNearestTerminal) {
+        nearestStop = {
+          properties: {
+            id: apiNearestTerminal.id,
+            name: apiNearestTerminal.name,
+            routeIds: apiNearestTerminal.routeIds
+          },
+          geometry: apiNearestTerminal.location
+        };
+      } else {
+        // Fallback Search
+        // ... (existing logic) ...
+      }
 
       if (!nearestStop) {
-        console.log("Could not find nearest stop.");
+        console.warn("No nearest bus stop found even after search.");
         return null;
       }
+
+
 
       // 4. Pick the common route between stop and school
       const stopRouteIds = nearestStop.properties.routeIds || [];
@@ -215,10 +236,7 @@ const App = () => {
 
       const busRoute = busRoutes.find(r => r.properties.id === commonRouteId);
 
-      if (!busRoute) {
-        console.log(`Bus route ${commonRouteId} not found in busRoutes state.`);
-        return null;
-      }
+      if (!busRoute) return null;
 
       const [stopLon, stopLat] = nearestStop.geometry.coordinates;
 
@@ -298,17 +316,66 @@ const App = () => {
         // Combine paths for display (selected mode to stop + bus line visualization)
         const combinedPath = [...selectedModeData.path, ...busLineCoords];
 
+        // 5. Find End Stop (Bus Stop closest to School on this route)
+        const routeStops = busStops.filter(s => {
+          const sRoutes = s.properties.routeIds || [];
+          return sRoutes.includes(commonRouteId);
+        });
+
+        let endStop = null;
+        let minSchoolDist = Infinity;
+        routeStops.forEach(s => {
+          const [slon, slat] = s.geometry.coordinates;
+          const d = calculateDist(parseFloat(schoolLat), parseFloat(schoolLon), slat, slon);
+          if (d < minSchoolDist) {
+            minSchoolDist = d;
+            endStop = s;
+          }
+        });
+
+        let lastMileCoords = [];
+        let lastMileDistance = 0;
+        let lastMileDuration = 0;
+
+        // Calculate Last Mile (Walk from End Stop to School)
+        if (endStop) {
+          try {
+            const [elon, elat] = endStop.geometry.coordinates;
+            // Don't calculate if very close (e.g. stop is AT school)
+            if (minSchoolDist > 20) {
+              const lastMileRes = await axios.post('http://localhost:5000/api/ors/directions', {
+                startLat: elat,
+                startLon: elon,
+                endLat: parseFloat(schoolLat),
+                endLon: parseFloat(schoolLon),
+                profile: 'foot-walking'
+              });
+
+              if (lastMileRes.data.features && lastMileRes.data.features.length > 0) {
+                const lmFeature = lastMileRes.data.features[0];
+                lastMileCoords = lmFeature.geometry.coordinates.map(c => [c[1], c[0]]);
+                lastMileDistance = lmFeature.properties.summary.distance;
+                lastMileDuration = lmFeature.properties.summary.duration / 60;
+              }
+            }
+          } catch (err) {
+            console.warn("Last mile calculation failed", err);
+          }
+        }
+
         // Return with all mode options
         return {
-          path: combinedPath, // Combined for overall route display
+          path: [...selectedModeData.path, ...busLineCoords, ...lastMileCoords], // Combined for overall route display
           walkPath: selectedModeData.path, // Selected mode segment
           busLinePath: busLineCoords, // Bus route line only
-          distance_meters: selectedModeData.distance, // Selected mode distance
-          duration_minutes: selectedModeData.duration, // Selected mode time
+          lastMilePath: lastMileCoords, // Walking segment from bus to school
+          distance_meters: selectedModeData.distance + lastMileDistance, // Total distance (walking parts)
+          duration_minutes: selectedModeData.duration + lastMileDuration + 15, // +15 mins est. bus wait/travel (simple heuristic)
           modeOptions: modeOptions, // All 3 mode options
           selectedMode: defaultMode, // Currently selected mode
           legs: { toStop: selectedModeData.data, busLine: busRoute },
           stopName: nearestStop.properties.name,
+          endStopName: endStop ? endStop.properties.name : 'Sekolah',
           routeName: busRoute.properties.name,
           isBusRoute: true // Flag to indicate this includes bus line display
         };
@@ -318,9 +385,31 @@ const App = () => {
       }
     })();
 
-    // Wait for all
     try {
       const [walkResult, privateResult, busResult] = await Promise.all([walkPromise, privatePromise, busPromise]);
+
+      // DEBUG LOGGING
+      console.log("Walk Result:", walkResult);
+      console.log("Bus Result:", busResult);
+
+      // CRITICAL: Check for total failure and report WHY
+      if (!walkResult && !busResult) {
+        if (targetSchool.properties.routeIds?.length === 0) {
+          toast.error("Sekolah ini tidak dilewati jalur Bus Sekolah. Dan rute jalan kaki gagal (terlalu jauh/error).");
+        } else if (!apiNearestTerminal) {
+          // We tried bus but failed finding terminal
+          toast.error("Gagal menemukan Halte Bus terdekat (dalam 3km) yang mengarah ke sekolah ini.");
+        } else {
+          // Terminal found, but routing failed? Likely ORS API.
+          toast.error("Gagal menghitung jalur. Periksa API Key OpenRouteService atau koneksi.");
+        }
+        // Don't return immediately, let the logic flow handle empty data gracefully?
+        // Actually, if we return, we might leave stale state.
+        // We should probably setRouteData(null).
+        setRouteData(null);
+        setComparisonResults(null);
+        return;
+      }
 
       // Construct Result Object
       const results = {
@@ -332,27 +421,58 @@ const App = () => {
       setComparisonResults(results);
 
       // Auto-Select Logic
-      let bestOption = 'private'; // Default fallback
-      if (distToSchool < 100 && walkResult) bestOption = 'walk';
-      else if (busResult && privateResult && busResult.duration_minutes < privateResult.duration_minutes * 1.5) bestOption = 'bus'; // If bus is comparable
-      else if (privateResult) bestOption = 'private';
+      // Auto-Select Logic
+      let bestOption = null;
+
+      // Smart Selection Logic (Logic Terbaik Berdasarkan Waktu & Efisiensi)
+      const walkDuration = walkResult ? walkResult.duration_minutes : Infinity;
+
+      // 1. Prioritize Walking for short distances (< 15 mins is healthy & fast)
+      if (walkResult && walkDuration <= 15) {
+        bestOption = 'walk';
+      }
+      // 2. If Walk is > 15 mins, ALWAYS prefer Bus School if available (User preference)
+      else if (busResult) {
+        bestOption = 'bus';
+      }
+      // 3. Fallback to Walk if no Bus available
+      else if (walkResult) {
+        bestOption = 'walk';
+      }
 
       const selectedData = results[bestOption];
+
       if (selectedData) {
         setRouteData(selectedData);
-        toast.success(`Rute ${bestOption.toUpperCase()} dipilih otomatis.`);
+        if (bestOption === 'bus') toast.success("Rute Bus Sekolah Direkomendasikan (Jarak Jauh).");
+        else if (bestOption === 'walk') toast.success("Jarak dekat (<15 min)! Disarankan jalan kaki.");
       } else {
-        // If best option failed, try others
-        if (walkResult) setRouteData(walkResult);
-        else if (privateResult) setRouteData(privateResult);
-        else toast.error("Tidak ada rute ditemukan.");
+        // If nothing found
+        if (privateResult) {
+          // Technically we found a private route but user said "remove it".
+          // We can optionally show it as a last resort or just error.
+          // "Hilangkan rute pribadi" -> Do not show.
+          toast.error("Tidak ada rute Bus Sekolah atau Jalan Kaki yang tersedia untuk lokasi ini.");
+        } else {
+          toast.error("Gagal menemukan rute transportasi apapun.");
+        }
       }
 
     } catch (e) {
       console.error("Error aggregating routes", e);
-      toast.error("Gagal mencari rute.");
+      toast.error("Terjadi kesalahan sistem saat mencari rute.");
     }
   };
+
+  // Auto-Calculate Route when Point and School are set
+  useEffect(() => {
+    if (startPoint && selectedSchool) {
+      const t = setTimeout(() => {
+        handleFindRoute(selectedSchool);
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [startPoint, selectedSchool]);
 
   // Reset/Clear State
   const handleReset = () => {
@@ -381,15 +501,16 @@ const App = () => {
         <div className="absolute inset-0 transition-opacity duration-1000 delay-500">
           <MapOverlay
             onSearchRoute={() => handleFindRoute(selectedSchool)}
+            nearestTerminal={nearestTerminal}
             toggleLayer={handleToggleLayer}
             layersState={layersState}
             routeData={routeData}
             schools={schools}
+            busRoutes={busRoutes}
             onSelectSchool={(school) => {
               handleSelectSchool(school);
               setSelectedSchool(school);
             }}
-            startPoint={startPoint}
             selectedSchool={selectedSchool}
             setSelectedSchool={setSelectedSchool}
             onReset={handleReset}
@@ -421,7 +542,7 @@ const App = () => {
         </div>
       )}
 
-      <Toaster />
+      <Toaster position="top-right" />
     </div>
   );
 };

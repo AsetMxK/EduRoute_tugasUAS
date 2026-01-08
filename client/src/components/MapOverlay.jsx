@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import { Search, MapPin, Bus, Layers, ChevronDown, ChevronUp, CircleDot } from 'lucide-react';
+import { Search, MapPin, Bus, Layers, ChevronDown, ChevronUp, CircleDot, Car, Bike, Footprints, Clock, AlertTriangle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, schools = [], onSelectSchool, startPoint, selectedSchool, setSelectedSchool, onReset, routePreference, setRoutePreference, comparisonResults, onSelectResult, busTransportMode, onChangeBusMode }) => {
+const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, schools = [], busRoutes = [], onSelectSchool, startPoint, selectedSchool, setSelectedSchool, onReset, routePreference, setRoutePreference, comparisonResults, onSelectResult, busTransportMode, onChangeBusMode, nearestTerminal }) => {
     const containerRef = useRef();
     const [isExpanded, setIsExpanded] = useState(true);
 
@@ -97,7 +97,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                 </div>
                             </div>
 
-                            {/* New Section: List of Schools */}
+                            {/* ... schools list ... */}
                             <div className="space-y-4 pt-4 border-t border-slate-100">
                                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Data Sekolah ({schools.length})</h4>
 
@@ -142,7 +142,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
 
             {/* --- BOTTOM RIGHT: Route Finder / Action Panel --- */}
             <div className="floating-controls pointer-events-auto self-end md:w-[400px] w-full mt-auto">
-                <Card className="bg-white/80 backdrop-blur-xl shadow-2xl border-white/50 dark:bg-slate-900/80 rounded-2xl overflow-hidden transition-all duration-500 hover:shadow- emerald-900/5">
+                <Card className="bg-white/80 backdrop-blur-xl shadow-2xl border-white/50 dark:bg-slate-900/80 rounded-2xl overflow-hidden transition-all duration-500 hover:shadow-emerald-900/5">
                     <CardHeader className="py-4 px-5 flex flex-row items-center justify-between space-y-0 cursor-pointer hover:bg-white/50 transition-colors border-b border-slate-100/50" onClick={() => setIsExpanded(!isExpanded)}>
                         <CardTitle className="text-base text-slate-800 font-bold flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -169,7 +169,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                     >
                                         <div className="flex justify-between items-center mb-1">
                                             <div className="flex items-center gap-2">
-                                                <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600"><span className="text-lg">🚶</span></div>
+                                                <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600"><Footprints className="w-5 h-5" /></div>
                                                 <span className="font-bold text-slate-700 text-sm">Jalan Kaki</span>
                                             </div>
                                             {comparisonResults.walk ? (
@@ -195,7 +195,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                     >
                                         <div className="flex justify-between items-center mb-1">
                                             <div className="flex items-center gap-2">
-                                                <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600"><span className="text-lg">🚗</span></div>
+                                                <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600"><Car className="w-5 h-5" /></div>
                                                 <span className="font-bold text-slate-700 text-sm">Kendaraan Pribadi</span>
                                             </div>
                                             {comparisonResults.private ? (
@@ -220,7 +220,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                     >
                                         <div className="flex justify-between items-center mb-1">
                                             <div className="flex items-center gap-2">
-                                                <div className="p-1.5 bg-amber-100 rounded-lg text-amber-600"><span className="text-lg">🚌</span></div>
+                                                <div className="p-1.5 bg-amber-100 rounded-lg text-amber-600"><Bus className="w-5 h-5" /></div>
                                                 <span className="font-bold text-slate-700 text-sm">Bus Sekolah</span>
                                             </div>
                                             {comparisonResults.bus ? (
@@ -250,7 +250,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                                                     }`}
                                                                 onClick={() => onChangeBusMode('walk')}
                                                             >
-                                                                <div className="text-xs">🚶</div>
+                                                                <div className="flex justify-center mb-1"><Footprints className="w-4 h-4 text-emerald-600" /></div>
                                                                 <div className="text-[10px] font-semibold text-slate-600">Jalan</div>
                                                                 <div className="text-[9px] text-slate-500">
                                                                     {Math.ceil(comparisonResults.bus.modeOptions.walk.duration)} min
@@ -267,7 +267,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                                                     }`}
                                                                 onClick={() => onChangeBusMode('car')}
                                                             >
-                                                                <div className="text-xs">🚗</div>
+                                                                <div className="flex justify-center mb-1"><Car className="w-4 h-4 text-blue-600" /></div>
                                                                 <div className="text-[10px] font-semibold text-slate-600">Mobil</div>
                                                                 <div className="text-[9px] text-slate-500">
                                                                     {Math.ceil(comparisonResults.bus.modeOptions.car.duration)} min
@@ -284,7 +284,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                                                     }`}
                                                                 onClick={() => onChangeBusMode('motor')}
                                                             >
-                                                                <div className="text-xs">🏍️</div>
+                                                                <div className="flex justify-center mb-1"><Bike className="w-4 h-4 text-purple-600" /></div>
                                                                 <div className="text-[10px] font-semibold text-slate-600">Motor</div>
                                                                 <div className="text-[9px] text-slate-500">
                                                                     {Math.ceil(comparisonResults.bus.modeOptions.motor.duration)} min
@@ -302,7 +302,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                 </div>
                             )}
 
-                            {/* Legacy Route Stats (Only show if we have route data but NOT comparison results - e.g. legacy state) */}
+                            {/* Legacy Route Stats */}
                             {routeData && !comparisonResults && (
                                 <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="bg-emerald-50/80 border border-emerald-100 rounded-xl p-3 flex flex-col items-center justify-center text-center">
@@ -321,7 +321,7 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                             {/* Warning for Last Mile */}
                             {routeData && routeData.requiresWalking && (
                                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex gap-2 items-start animate-in fade-in zoom-in-95">
-                                    <span className="text-lg">🚶</span>
+                                    <AlertTriangle className="w-5 h-5 shrink-0" />
                                     <div>
                                         <strong>Akses Terbatas:</strong> Kendaraan mungkin tidak dapat mencapai titik tepat. Silakan lanjutkan dengan berjalan kaki.
                                     </div>
@@ -329,8 +329,9 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                             )}
 
                             <Tabs defaultValue="route" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2 h-10 mb-0 bg-slate-100/80 p-1 rounded-xl">
+                                <TabsList className="grid w-full grid-cols-3 h-10 mb-0 bg-slate-100/80 p-1 rounded-xl">
                                     <TabsTrigger value="info" className="text-xs font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">Info</TabsTrigger>
+                                    <TabsTrigger value="bus" className="text-xs font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm">Bus</TabsTrigger>
                                     <TabsTrigger value="route" className="text-xs font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">Rute</TabsTrigger>
                                 </TabsList>
 
@@ -338,6 +339,79 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                     <div className="text-sm text-slate-600 min-h-[100px] flex flex-col items-center justify-center text-center px-4 space-y-2">
                                         <MapPin className="w-8 h-8 text-slate-300 mb-2" />
                                         <p>Klik marker sekolah di peta untuk melihat detail zonasi dan info lainnya.</p>
+                                    </div>
+                                </TabsContent>
+
+                                {/* Bus Routes Tab */}
+                                <TabsContent value="bus" className="mt-0 animate-in fade-in zoom-in-95">
+                                    <div className="space-y-3">
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Daftar Rute Bus ({busRoutes.length})</div>
+
+                                        {busRoutes.length === 0 ? (
+                                            <div className="text-sm text-slate-500 text-center py-6">
+                                                <Bus className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                                <p>Tidak ada data rute bus.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
+                                                {busRoutes.map((route, idx) => {
+                                                    // Find schools connected to this route
+                                                    const connectedSchools = schools.filter(school =>
+                                                        school.properties.routeIds?.includes(route.properties.id)
+                                                    );
+
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            className="p-3 bg-white hover:bg-amber-50/50 border border-slate-100 hover:border-amber-200 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md"
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                {/* Color indicator */}
+                                                                <div
+                                                                    className="w-4 h-4 rounded-full shrink-0 mt-0.5 ring-2 ring-white shadow-sm"
+                                                                    style={{ backgroundColor: route.properties.color || '#888' }}
+                                                                />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h5 className="text-sm font-bold text-slate-700 group-hover:text-amber-700 transition-colors truncate">
+                                                                        {route.properties.name}
+                                                                    </h5>
+                                                                    {route.properties.description && (
+                                                                        <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
+                                                                            {route.properties.description}
+                                                                        </p>
+                                                                    )}
+
+                                                                    {/* Connected Schools */}
+                                                                    {connectedSchools.length > 0 && (
+                                                                        <div className="mt-2 flex flex-wrap gap-1">
+                                                                            {connectedSchools.map((school, sIdx) => (
+                                                                                <span
+                                                                                    key={sIdx}
+                                                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-medium rounded-md border border-emerald-100"
+                                                                                >
+                                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                                                    {school.properties.name}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Schedule info if available */}
+                                                                    {route.properties.schedule && (
+                                                                        <div className="mt-1.5 text-[10px] text-slate-500 flex items-center gap-2">
+                                                                            <Clock className="w-3 h-3 text-slate-400" />
+                                                                            <span>{route.properties.schedule.departure || 'N/A'}</span>
+                                                                            <span className="text-[9px]">s/d</span>
+                                                                            <span>{route.properties.schedule.return || 'N/A'}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </TabsContent>
 
@@ -353,8 +427,8 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                                     {startPoint ? (
                                                         startPoint.nodeId
                                                             ? `Node #${startPoint.nodeId} (Dekat Jalan Raya)`
-                                                            : `📍 Koordinat: ${startPoint.lat.toFixed(4)}, ${startPoint.lng.toFixed(4)}`
-                                                    ) : <span className="text-slate-400 italic font-normal">Klik peta untuk set lokasi...</span>}
+                                                            : `Koordinat: ${startPoint.lat.toFixed(4)}, ${startPoint.lng.toFixed(4)}`
+                                                    ) : <span className="text-slate-400 italic font-normal">Klik peta untuk set pointer lokasi...</span>}
                                                 </p>
                                             </div>
                                         </div>
@@ -384,51 +458,59 @@ const MapOverlay = ({ onSearchRoute, toggleLayer, layersState, routeData, school
                                             </div>
                                         </div>
 
-                                        {/* Route Preference */}
-                                        <div className="flex gap-2 items-center text-xs font-semibold text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                            <span className="text-[10px] uppercase font-bold tracking-wider mr-1">Tipe:</span>
-                                            <div className="flex gap-1 flex-1">
-                                                <button
-                                                    onClick={() => setRoutePreference && setRoutePreference('recommended')}
-                                                    className={`flex-1 py-1 px-2 rounded-md text-[10px] transition-all border ${routePreference === 'recommended'
-                                                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm'
-                                                        : 'bg-white text-slate-500 border-transparent hover:bg-slate-100'}`}
-                                                >
-                                                    Terbaik
-                                                </button>
-                                                <button
-                                                    onClick={() => setRoutePreference && setRoutePreference('shortest')}
-                                                    className={`flex-1 py-1 px-2 rounded-md text-[10px] transition-all border ${routePreference === 'shortest'
-                                                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm'
-                                                        : 'bg-white text-slate-500 border-transparent hover:bg-slate-100'}`}
-                                                >
-                                                    Terpendek
-                                                </button>
+                                        {/* Nearest Terminal Info - NEW */}
+                                        {nearestTerminal && (
+                                            <div className="relative group animate-in fade-in zoom-in-95">
+                                                <div className="absolute -left-[18px] top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-[3px] border-amber-500 bg-white shadow-sm ring-4 ring-amber-500/10"></div>
+                                                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex flex-col justify-center">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <Bus className="w-3 h-3 text-amber-600" />
+                                                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Halte Terdekat</p>
+                                                    </div>
+                                                    <p className="text-sm font-bold text-slate-800">{nearestTerminal.name}</p>
+                                                    <div className="flex justify-between items-center mt-1">
+                                                        <span className="text-xs text-slate-500">{nearestTerminal.distance_meters}m dari lokasi Anda</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
 
-                                        {/* Line Connector (Moved to end to preserve z-index but fix spacing flow) */}
+                                        {/* Line Connector */}
                                         <div className="absolute left-[11px] top-3 bottom-14 w-0.5 bg-slate-200 -z-10" />
 
                                     </div>
 
+                                    {routeData ? (
+                                        <div className="pt-4 space-y-2 animate-in fade-in slide-in-from-bottom-2">
+                                            <div className="bg-gradient-to-br from-emerald-50 to-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center relative overflow-hidden">
+                                                <div className="absolute top-0 right-0 p-2 opacity-10"><Clock className="w-16 h-16 text-emerald-600" /></div>
+                                                <p className="text-[10px] text-emerald-600/80 font-bold uppercase tracking-widest mb-1">Estimasi Perjalanan</p>
+                                                <div className="flex justify-center items-baseline gap-1.5 z-10 relative">
+                                                    <span className="text-4xl font-black text-emerald-600 tracking-tighter">{Math.ceil(routeData.duration_minutes)}</span>
+                                                    <span className="text-sm font-bold text-emerald-600/70">menit</span>
+                                                </div>
+                                                <div className="text-xs font-semibold text-slate-500 mt-1 z-10 relative">
+                                                    Jarak Tempuh: <span className="text-slate-700">{(routeData.distance_meters / 1000).toFixed(1)} km</span>
+                                                </div>
+                                            </div>
 
-
-                                    <div className="flex gap-2 pt-2">
-                                        <Button
-                                            variant="outline"
-                                            className="flex-1 border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold"
-                                            onClick={onReset}
-                                        >
-                                            Reset
-                                        </Button>
-                                        <Button
-                                            className="flex-[2] bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 text-white font-bold tracking-wide transition-all active:scale-95"
-                                            onClick={onSearchRoute}
-                                        >
-                                            Mulai Navigasi
-                                        </Button>
-                                    </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={onReset}
+                                                className="w-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors h-8 text-xs"
+                                            >
+                                                Mulai Ulang / Reset
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="pt-6 pb-2 text-center space-y-2 opacity-60">
+                                            <div className="w-1 mx-auto h-8 bg-gradient-to-b from-slate-200 to-transparent rounded-full"></div>
+                                            <p className="text-xs text-slate-400 font-medium px-4">
+                                                Sistem akan otomatis menghitung rute tercepat setelah Anda menentukan lokasi dan sekolah.
+                                            </p>
+                                        </div>
+                                    )}
                                 </TabsContent>
                             </Tabs>
                         </CardContent>

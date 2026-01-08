@@ -15,7 +15,14 @@ import { toast } from "sonner"; // shadcn uses sonner usually, or toast
 // Let's assume standard behavior.
 
 // Custom Icons using generic HTML
-const createCustomIcon = (color, emoji) => {
+const createCustomIcon = (color, iconType) => {
+    // SVG icons for different marker types
+    const icons = {
+        school: `<svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="none"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>`,
+        bus: `<svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/></svg>`,
+        pin: `<svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`
+    };
+
     return L.divIcon({
         className: 'custom-marker',
         html: `<div style="
@@ -28,15 +35,14 @@ const createCustomIcon = (color, emoji) => {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
-        ">${emoji}</div>`,
+        ">${icons[iconType] || icons.pin}</div>`,
         iconSize: [32, 32],
         iconAnchor: [16, 32],
         popupAnchor: [0, -32]
     });
 };
 
-const schoolIcon = createCustomIcon('#10b981', '🏫'); // Emerald-500
+const schoolIcon = createCustomIcon('#10b981', 'school'); // Emerald-500
 
 // SVG Pin Icon for Start Location (Better visual)
 const startIcon = L.divIcon({
@@ -64,14 +70,18 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     return R * c;
 };
 
-// Helper component to handle map clicks with Snapping (Simplified for ORS: No Graph Snapping)
-function ClickHandler({ setStartPoint }) {
+// Helper component to handle map clicks with Snapping to Nearest Road Node
+function ClickHandler({ setStartPoint, enablePinpoint }) {
     useMapEvents({
-        click(e) {
+        async click(e) {
+            // Only set point if pinpoint mode is enabled
+            if (!enablePinpoint) return;
+
             const { lat, lng } = e.latlng;
-            // Direct set without snapping to graph nodes
+
+            // Optimistic Direct Set (Let Backend ORS handle snapping via radiuses parameter)
             setStartPoint({ lat, lng, nodeId: null });
-            // toast("Lokasi diset"); 
+            toast.success("Lokasi ditentukan.");
         },
     });
     return null;
@@ -100,7 +110,7 @@ const MapController = ({ startPoint, selectedSchool }) => {
 
 
 
-const MapView = ({ layersState, currentRoutePath = [], routeData = null, lastMilePath = null, schools = [], schoolAreas = [], busStops = [], busStopAreas = [], busRoutes = [], roads = null, startPoint, setStartPoint, selectedSchool, setSelectedSchool, onFindRoute }) => {
+const MapView = ({ layersState, currentRoutePath = [], routeData = null, lastMilePath = null, schools = [], schoolAreas = [], busStops = [], busStopAreas = [], busRoutes = [], roads = null, startPoint, setStartPoint, selectedSchool, setSelectedSchool, onFindRoute, enablePinpoint = true }) => {
 
     return (
         <div className="h-full w-full z-0 relative">
@@ -116,7 +126,7 @@ const MapView = ({ layersState, currentRoutePath = [], routeData = null, lastMil
                 />
 
                 <MapController startPoint={startPoint} selectedSchool={selectedSchool} />
-                <ClickHandler setStartPoint={setStartPoint} />
+                <ClickHandler setStartPoint={setStartPoint} enablePinpoint={enablePinpoint} />
 
                 {/* Render Streets / Roads */}
                 {layersState.roads && roads && roads.features && roads.features.map((feature, idx) => {
@@ -201,29 +211,43 @@ const MapView = ({ layersState, currentRoutePath = [], routeData = null, lastMil
                 ))}
 
                 {/* 3. Bus Routes (Lines) */}
-                {layersState.busRoutes && busRoutes.map((route, idx) => (
-                    <Polyline
-                        key={`bus-route-${idx}`}
-                        positions={route.geometry.type === 'MultiLineString'
-                            ? route.geometry.coordinates.map(segment => segment.map(coord => [coord[1], coord[0]]))
-                            : route.geometry.coordinates.map(coord => [coord[1], coord[0]])
-                        }
-                        pathOptions={{
-                            color: route.properties.color || '#f59e0b',
-                            weight: 5,
-                            opacity: 0.8,
-                            lineCap: 'round',
-                            lineJoin: 'round'
-                        }}
-                    >
-                        <Popup>
-                            <div className="text-sm">
-                                <b className="text-amber-700 block">{route.properties.name}</b>
-                                <span className="text-xs text-slate-500">{route.properties.description}</span>
-                            </div>
-                        </Popup>
-                    </Polyline>
-                ))}
+                {layersState.busRoutes && busRoutes.map((route, idx) => {
+                    // Palette for distinct routes
+                    const palette = [
+                        '#e11d48', // Rose
+                        '#d97706', // Amber
+                        '#16a34a', // Green
+                        '#2563eb', // Blue
+                        '#7c3aed', // Violet
+                        '#db2777', // Pink
+                        '#0891b2', // Cyan
+                    ];
+                    const routeColor = palette[idx % palette.length];
+
+                    return (
+                        <Polyline
+                            key={`bus-route-${idx}`}
+                            positions={route.geometry.type === 'MultiLineString'
+                                ? route.geometry.coordinates.map(segment => segment.map(coord => [coord[1], coord[0]]))
+                                : route.geometry.coordinates.map(coord => [coord[1], coord[0]])
+                            }
+                            pathOptions={{
+                                color: routeColor,
+                                weight: 5,
+                                opacity: 0.8,
+                                lineCap: 'round',
+                                lineJoin: 'round'
+                            }}
+                        >
+                            <Popup>
+                                <div className="text-sm">
+                                    <b style={{ color: routeColor }} className="block text-base">{route.properties.name}</b>
+                                    <span className="text-xs text-slate-500">{route.properties.description}</span>
+                                </div>
+                            </Popup>
+                        </Polyline>
+                    );
+                })}
 
                 {/* 4. Bus Stops (Markers) */}
                 {layersState.busStops && busStops.map((stop, idx) => (
@@ -239,7 +263,7 @@ const MapView = ({ layersState, currentRoutePath = [], routeData = null, lastMil
                         }}
                     >
                         <Popup>
-                            <strong>🚏 {stop.properties.name}</strong><br />
+                            <strong>{stop.properties.name}</strong><br />
                             <span className="text-xs text-slate-500">{stop.properties.address}</span>
                         </Popup>
                     </CircleMarker>
@@ -263,55 +287,71 @@ const MapView = ({ layersState, currentRoutePath = [], routeData = null, lastMil
                             <Polyline
                                 positions={routeData.walkPath}
                                 pathOptions={{
-                                    color: '#10b981', // Emerald green for walking
+                                    color: '#06b6d4', // Cyan-500 for First Mile Walk
                                     weight: 5,
-                                    opacity: 0.8
+                                    opacity: 0.9,
+                                    lineCap: 'round'
                                 }}
                             >
-                                <Popup>🚶 Jalan Kaki ke Halte</Popup>
+                                <Popup>Jalan Kaki ke Halte</Popup>
                             </Polyline>
                         )}
-                        {/* Bus route line */}
+                        {/* Bus route line (Dynamic Color) */}
                         {routeData.busLinePath && (
                             <Polyline
                                 positions={routeData.busLinePath}
                                 pathOptions={{
-                                    color: '#f59e0b', // Amber/Orange for bus
+                                    color: routeData.legs?.busLine?.properties?.color || '#7c3aed', // Use dynamic color from DB
                                     weight: 6,
-                                    opacity: 0.9,
-                                    dashArray: '15, 10'
+                                    opacity: 1,
+                                    dashArray: '0',
+                                    lineCap: 'square'
                                 }}
                             >
-                                <Popup>🚌 Jalur Bus Sekolah</Popup>
+                                <Popup>Jalur Bus Sekolah (Perjalanan Utama)</Popup>
+                            </Polyline>
+                        )}
+                        {/* Last Mile Path (Walking Segment from Bus to School) */}
+                        {routeData.lastMilePath && (
+                            <Polyline
+                                positions={routeData.lastMilePath}
+                                pathOptions={{
+                                    color: '#14b8a6', // Teal-500
+                                    weight: 5,
+                                    opacity: 0.9,
+                                    dashArray: '10, 10'
+                                }}
+                            >
+                                <Popup className="text-sm font-bold text-teal-700">Jalan Kaki ke Sekolah</Popup>
                             </Polyline>
                         )}
                     </>
                 ) : (
-                    /* Normal route (walk or drive to school directly) */
-                    currentRoutePath && currentRoutePath.length > 0 && (
+                    /* Normal route (Only show if NOT private vehicle - e.g. Walk Only) */
+                    currentRoutePath && currentRoutePath.length > 0 && routeData?.selectedMode !== 'private' && (
                         <Polyline
                             positions={currentRoutePath}
                             pathOptions={{
-                                color: '#3b82f6', // Blue for normal routes
+                                color: '#06b6d4', // Cyan for Walk Only
                                 weight: 6,
-                                opacity: 0.8
+                                opacity: 0.9
                             }}
                         />
                     )
                 )}
 
-                {/* Last Mile Path (Walking Segment) */}
-                {lastMilePath && (
+                {/* Legacy Last Mile Path (Keep for backward compatibility if needed, but above covers it) */}
+                {lastMilePath && !routeData?.lastMilePath && (
                     <Polyline
                         positions={lastMilePath}
                         pathOptions={{
-                            color: '#10b981', // Emerald for walking
+                            color: '#14b8a6',
                             weight: 4,
                             opacity: 0.8,
-                            dashArray: '10, 10'
+                            dashArray: '8, 8'
                         }}
                     >
-                        <Popup className="text-sm font-bold text-emerald-700">Lanjutkan Jalan Kaki</Popup>
+                        <Popup>Lanjutkan Jalan Kaki</Popup>
                     </Polyline>
                 )}
 
